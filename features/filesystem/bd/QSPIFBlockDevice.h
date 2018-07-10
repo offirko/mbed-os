@@ -24,7 +24,7 @@
 //#include "./mbed-os/drivers/QSPI.h"
 
 #define QSPIF_MAX_REGIONS	4
- 
+
 class QSPIFBlockDevice : public BlockDevice {
 public:
     /** Creates a QSPIFBlockDevice on a SPI bus specified by pins
@@ -35,7 +35,7 @@ public:
      *  @param csel     SPI chip select pin
      *  @param freq     Clock speed of the SPI bus (defaults to 40MHz)
      */
-	 
+
     /** Creates a QSPIFBlockDevice on an SPI bus specified by pins
      *
      *  io0-io3 is used to specify the Pins used for Quad SPI mode
@@ -51,7 +51,8 @@ public:
      *  @param freq Clock frequency of the SPI bus (defaults to 40MHz)
      *
      */
-    QSPIFBlockDevice(PinName io0, PinName io1, PinName io2, PinName io3, PinName sclk, PinName csel, int clock_mode, int freq=40000000);
+    QSPIFBlockDevice(PinName io0, PinName io1, PinName io2, PinName io3, PinName sclk, PinName csel, int clock_mode,
+                     int freq = 40000000);
 
     /** Initialize a block device
      *
@@ -114,41 +115,45 @@ public:
      *  @note Must be a multiple of the program size
      */
     virtual bd_size_t get_erase_size() const;
-	
+
     /** Get the size of a eraseable block
      *
-	 *  @param addr     Address of block queried for erase sector size
+     *  @param addr     Address of block queried for erase sector size
      *  @return         Size of a eraseable sector in bytes
      *  @note Must be a multiple of the program size
      */
-	bd_size_t get_erase_size(bd_addr_t addr);
+    bd_size_t get_erase_size(bd_addr_t addr);
 
     /** Get the total size of the underlying device
      *
      *  @return         Size of the underlying device in bytes
      */
     virtual bd_size_t size() const;
-    
-private:	
+
+private:
     // Internal functions
-	
+
     /********************************/
     /*   Calls to QSPI Driver APIs  */
     /********************************/
-	// Send Program => Write command to Driver
-    qspi_status_t _qspiSendProgramCommand(unsigned int progInstruction, const void *buffer, bd_addr_t addr, bd_size_t *size);
+    // Send Program => Write command to Driver
+    qspi_status_t _qspiSendProgramCommand(unsigned int progInstruction, const void *buffer, bd_addr_t addr,
+                                          bd_size_t *size);
 
-	// Send Read command to Driver
+    // Send Read command to Driver
     qspi_status_t _qspiSendReadCommand(unsigned int readInstruction, void *buffer, bd_addr_t addr, bd_size_t size);
 
-	// Send Erase => command_transfer command to Driver
+    // Send Erase => command_transfer command to Driver
     qspi_status_t _qspiSendEraseCommand(unsigned int eraseInstruction, bd_addr_t addr, bd_size_t size);
 
-	// Send Generic command_transfer command to Driver
-    qspi_status_t _qspiSendGeneralCommand(unsigned int instructionint, bd_addr_t addr, const char *tx_buffer, size_t tx_length, const char *rx_buffer, size_t rx_length);
+    // Send Generic command_transfer command to Driver
+    qspi_status_t _qspiSendGeneralCommand(unsigned int instructionint, bd_addr_t addr, const char *tx_buffer,
+                                          size_t tx_length, const char *rx_buffer, size_t rx_length);
 
     // Send Bus configure_format command to Driver
-    qspi_status_t _qspiConfiureFormat(qspi_bus_width_t inst_width, qspi_bus_width_t address_width, qspi_address_size_t address_size, qspi_bus_width_t alt_width, qspi_alt_size_t alt_size, qspi_bus_width_t data_width, int dummy_cycles);
+    qspi_status_t _qspiConfiureFormat(qspi_bus_width_t inst_width, qspi_bus_width_t address_width,
+                                      qspi_address_size_t address_size, qspi_bus_width_t alt_width, qspi_alt_size_t alt_size, qspi_bus_width_t data_width,
+                                      int dummy_cycles);
 
     // Send set_frequency command to Driver
     qspi_status_t _qspiSetFrequency(int freq);
@@ -156,31 +161,33 @@ private:
 
 
     // Verify registers and Reset Flash Memory
-	int _resetFlashMem();
-	
-	// Configure Write Enable in Status Register
+    int _resetFlashMem();
+
+    // Configure Write Enable in Status Register
     int _setWriteEnable();
-	
-	// Wait on status register until write not-in-progress
+
+    // Wait on status register until write not-in-progress
     bool _isMemReady();
 
 
     /* SFDP Detection and Parsing Functions */
     /****************************************/
-    int _sfdpParseSFDPHeaders(uint32_t &basic_table_addr, size_t &basic_table_size,
-    						 uint32_t &sector_map_table_addr, size_t &sector_map_table_size);
+    int _sfdpParseSFDPHeaders(uint32_t& basic_table_addr, size_t& basic_table_size,
+                              uint32_t& sector_map_table_addr, size_t& sector_map_table_size);
     int _sfdpParseBasicParamTable(uint32_t basic_table_addr, size_t basic_table_size);
     int _sfdpParseSectorMapTable(uint32_t sector_map_table_addr, size_t sector_map_table_size);
-    int _sfdpDetectBestBusReadMode(uint8_t *basicParamTablePtr, bool &setQuadEnable, bool &isQPIMode, unsigned int &readInst);
+    int _sfdpDetectBestBusReadMode(uint8_t *basicParamTablePtr, bool& setQuadEnable, bool& isQPIMode,
+                                   unsigned int& readInst);
     int _sfdpSetQuadEnabled(uint8_t *basicParamTablePtr);
     int _sfdpSetQPIEnabled(uint8_t *basicParamTablePtr);
     int _sfdpDetectPageSize(uint8_t *basicParamTablePtr);
-    int _sfdpDetectEraseTypesInstAndSize(uint8_t *basicParamTablePtr, unsigned int &erase4KInst, unsigned int *eraseTypeInstArr, unsigned int *eraseTypeSizeArr);
+    int _sfdpDetectEraseTypesInstAndSize(uint8_t *basicParamTablePtr, unsigned int& erase4KInst,
+                                         unsigned int *eraseTypeInstArr, unsigned int *eraseTypeSizeArr);
 
     /* Utilities Functions */
     /***********************/
     int _utilsFindAddrRegion(int offset);
-    int _utilsIterateNextLargestEraseType(uint8_t &bitfield, int size, int offset, int boundry);
+    int _utilsIterateNextLargestEraseType(uint8_t& bitfield, int size, int offset, int boundry);
     int _utilsMathPower(int base, int exp);
 
 private:
