@@ -638,7 +638,7 @@
     },
     "K64F": {
         "supported_form_factors": ["ARDUINO"],
-        "components": ["SD"],
+        "components": ["SD", "FLASHIAP"],
         "core": "Cortex-M4F",
         "supported_toolchains": ["ARM", "GCC_ARM", "IAR"],
         "extra_labels": ["Freescale", "MCUXpresso_MCUS", "KSDK2_MCUS", "FRDM", "KPSDK_MCUS", "KPSDK_CODE", "MCU_K64F", "Freescale_EMAC"],
@@ -738,7 +738,7 @@
     },
     "K66F": {
         "supported_form_factors": ["ARDUINO"],
-        "components": ["SD"],
+        "components": ["SD", "FLASHIAP"],
         "core": "Cortex-M4F",
         "supported_toolchains": ["ARM", "GCC_ARM", "IAR"],
         "extra_labels": ["Freescale", "MCUXpresso_MCUS", "KSDK2_MCUS", "FRDM", "Freescale_EMAC"],
@@ -756,7 +756,7 @@
     },
     "K82F": {
         "supported_form_factors": ["ARDUINO"],
-        "components": ["SPIF"],
+        "components": ["SPIF", "FLASHIAP"],
         "core": "Cortex-M4F",
         "supported_toolchains": ["ARM", "GCC_ARM", "IAR"],
         "extra_labels": ["Freescale", "MCUXpresso_MCUS", "KSDK2_MCUS", "FRDM"],
@@ -1237,7 +1237,7 @@
     },
     "USI_WM_BN_BM_22": {
         "inherits": ["FAMILY_STM32"],
-        "components": ["SPIF"],
+        "components": ["SPIF", "FLASHIAP"],
         "core": "Cortex-M4F",
         "extra_labels_add": ["STM32F4", "STM32F412xG", "STM32F412ZG", "WICED", "CYW4343X", "CORDIO"],
         "features": ["BLE", "STORAGE"],
@@ -2085,7 +2085,7 @@
         }
     },
     "DISCO_L475VG_IOT01A": {
-        "components": ["QSPIF"],
+        "components": ["QSPIF", "FLASHIAP"],
         "inherits": ["FAMILY_STM32"],
         "core": "Cortex-M4F",
         "extra_labels_add": ["STM32L4", "STM32L475xG", "STM32L475VG"],
@@ -2109,7 +2109,7 @@
         "bootloader_supported": true
     },
     "DISCO_L476VG": {
-        "components": ["QSPIF"],
+        "components": ["QSPIF", "FLASHIAP"],
         "inherits": ["FAMILY_STM32"],
         "core": "Cortex-M4F",
         "extra_labels_add": ["STM32L4", "STM32L476xG", "STM32L476VG"],
