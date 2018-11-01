@@ -41,6 +41,11 @@ typedef struct {
 
 using namespace mbed;
 
+// Local Functions
+static char *string_ndup(const char *src, size_t size);
+
+
+// Class Functions
 FileSystemStore::FileSystemStore(FileSystem *fs) : _fs(fs),
     _is_initialized(false)
 {
@@ -54,7 +59,7 @@ int FileSystemStore::init()
     _mutex.lock();
 
     _cfg_fs_path_size = strlen(FSST_FOLDER_PATH);
-    _cfg_fs_path = strndup(FSST_FOLDER_PATH, _cfg_fs_path_size);
+    _cfg_fs_path = string_ndup(FSST_FOLDER_PATH, _cfg_fs_path_size);
     _full_path_key = new char[_cfg_fs_path_size + KVStore::MAX_KEY_SIZE + 1];
     memset(_full_path_key, 0, (_cfg_fs_path_size + KVStore::MAX_KEY_SIZE + 1));
     strncpy(_full_path_key, _cfg_fs_path, _cfg_fs_path_size);
@@ -309,6 +314,7 @@ int FileSystemStore::set_start(set_handle_t *handle, const char *key, size_t fin
     key_metadata_t key_metadata;
     int key_len = 0;
 
+    // Only a single key file can be incrementaly editted at a time
     _mutex.lock();
 
     if ((key == NULL) || (handle == NULL) ) {
@@ -342,7 +348,7 @@ int FileSystemStore::set_start(set_handle_t *handle, const char *key, size_t fin
     set_handle->create_flags = create_flags;
     set_handle->data_size = final_data_size;
     key_len = strnlen(key, KVStore::MAX_KEY_SIZE);
-    set_handle->key = strndup(key, key_len);
+    set_handle->key = string_ndup(key, key_len);
     *handle = (set_handle_t)set_handle;
 
     key_metadata.magic = FSST_MAGIC;
@@ -370,9 +376,11 @@ int FileSystemStore::set_add_data(set_handle_t handle, const void *value_data, s
         goto exit_point;
     }
 
+    // Single key incrementally edited, can be edited from multiple threads - lock to protect
+    _inc_data_add_mutex.lock();
     if ( (_cur_inc_data_size + data_size) > set_handle->data_size ) {
-        tr_error("Added Data exceeds set_start final size - corrupted data, deleteing file: %s", _full_path_key);
-        _fs->remove(_full_path_key);
+        tr_warning("Added Data(%d) will exceed set_start final size(%d) - not adding data to file: %s",
+                   _cur_inc_data_size + data_size, set_handle->data_size, _full_path_key);
         status = MBED_ERROR_INVALID_DATA_DETECTED;
         goto exit_point;
     }
@@ -391,9 +399,11 @@ int FileSystemStore::set_add_data(set_handle_t handle, const void *value_data, s
     kv_file.close();
 
 exit_point:
+    if (status != MBED_ERROR_INVALID_ARGUMENT) {
+        _inc_data_add_mutex.unlock();
+    }
 
     return status;
-
 }
 
 int FileSystemStore::set_finalize(set_handle_t handle)
@@ -412,9 +422,8 @@ int FileSystemStore::set_finalize(set_handle_t handle)
         status = MBED_ERROR_INVALID_DATA_DETECTED;
     } else {
         if (_cur_inc_data_size != set_handle->data_size ) {
-            tr_error("Added Data doesn't match set_start final size - corrupted data, deleteing file: %s", _full_path_key);
-            _fs->remove(_full_path_key);
-            status = MBED_ERROR_INVALID_DATA_DETECTED;
+            tr_warning("Accumulated Data size doesn't match set_start final size - file: %s", _cur_inc_data_size,
+                       set_handle->data_size, _full_path_key);
         }
 
         free(set_handle->key);
@@ -450,7 +459,7 @@ int FileSystemStore::iterator_open(iterator_t *it, const char *prefix)
     key_it->dir_handle = NULL;
     key_it->prefix = NULL;
     if (prefix != NULL) {
-        key_it->prefix = strndup(prefix, KVStore::MAX_KEY_SIZE);
+        key_it->prefix = string_ndup(prefix, KVStore::MAX_KEY_SIZE);
     }
 
     kv_dir = new Dir;
@@ -588,5 +597,15 @@ int FileSystemStore::_build_full_path_key(const char *key_src)
     _full_path_key[(_cfg_fs_path_size + KVStore::MAX_KEY_SIZE)] = '\0';
     return 0;
 }
+
+// Local Functions
+static char *string_ndup(const char *src, size_t size)
+{
+    char *string_copy = (char *) malloc (size + 1);
+    strncpy(string_copy, src, size);
+    string_copy[size] = '\0';
+    return string_copy;
+}
+
 
 

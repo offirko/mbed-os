@@ -205,6 +205,7 @@ private:
 private:
     FileSystem *_fs;
     PlatformMutex _mutex;
+    PlatformMutex _inc_data_add_mutex;
 
     bool _is_initialized;
     char *_cfg_fs_path; /* FileSystemStore path name on FileSystem */

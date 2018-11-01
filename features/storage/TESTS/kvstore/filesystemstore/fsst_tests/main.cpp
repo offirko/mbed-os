@@ -17,9 +17,8 @@
 #include "greentea-client/test_env.h"
 #include "unity.h"
 #include "utest.h"
-#include "SPIFBlockDevice.h"
-#include "LittleFileSystem.h"
-#include "FATFileSystem.h"
+#include "BlockDevice.h"
+#include "FileSystem.h"
 #include "FileSystemStore.h"
 #include "mbed_trace.h"
 #include "rtos/Thread.h"
@@ -30,16 +29,12 @@
 using namespace utest::v1;
 using namespace mbed;
 
-//SPIFBlockDevice bd(PTE2, PTE4, PTE1, PTE5);
-SPIFBlockDevice bd(MBED_CONF_SPIF_DRIVER_SPI_MOSI, MBED_CONF_SPIF_DRIVER_SPI_MISO, MBED_CONF_SPIF_DRIVER_SPI_CLK,
-                   MBED_CONF_SPIF_DRIVER_SPI_CS);
+BlockDevice *bd = BlockDevice::get_default_instance();
 
 typedef struct {
     int thread_num;
     FileSystemStore *fsst;
 } thread_data_t;
-
-
 
 static void test_set_thread_job(void *data)
 {
@@ -79,18 +74,18 @@ void test_file_system_store_functionality_unit_test()
     int err = 0;
     size_t actual_size = 0;
 
-    err = bd.init();
+    err = bd->init();
     TEST_ASSERT_EQUAL(0, err);
-    LittleFileSystem fs("lfs", &bd);
-    //FATFileSystem fs("fatfs", &bd);
 
-    err = fs.mount(&bd);
+    FileSystem *fs = FileSystem::get_default_instance();
+
+    err = fs->mount(bd);
     if (err) {
-        err = fs.reformat(&bd);
+        err = fs->reformat(bd);
         TEST_ASSERT_EQUAL(0, err);
     }
 
-    FileSystemStore *fsst = new FileSystemStore(&fs);
+    FileSystemStore *fsst = new FileSystemStore(fs);
 
     err = fsst->init();
     TEST_ASSERT_EQUAL(0, err);
@@ -198,7 +193,7 @@ void test_file_system_store_functionality_unit_test()
 
     err = fsst->deinit();
     TEST_ASSERT_EQUAL(0, err);
-    err = bd.deinit();
+    err = bd->deinit();
     TEST_ASSERT_EQUAL(0, err);
 }
 
@@ -216,18 +211,17 @@ void test_file_system_store_edge_cases()
     char kv_name[16] = {0};
 
 
-    int err = bd.init();
+    int err = bd->init();
     TEST_ASSERT_EQUAL(0, err);
-    LittleFileSystem fs("lfs", &bd);
-    //FATFileSystem fs("fatfs", &bd);
+    FileSystem *fs = FileSystem::get_default_instance();
 
-    err = fs.mount(&bd);
+    err = fs->mount(bd);
     if (err) {
-        err = fs.reformat(&bd);
+        err = fs->reformat(bd);
         TEST_ASSERT_EQUAL(0, err);
     }
 
-    FileSystemStore *fsst = new FileSystemStore(&fs);
+    FileSystemStore *fsst = new FileSystemStore(fs);
 
     err = fsst->init();
     TEST_ASSERT_EQUAL(0, err);
@@ -383,7 +377,7 @@ void test_file_system_store_edge_cases()
     err = fsst->set_add_data(handle, "abcde12345", 10);
     TEST_ASSERT_NOT_EQUAL(0, err);
     err = fsst->set_add_data(handle, "abcde12345", 5);
-    TEST_ASSERT_NOT_EQUAL(0, err);
+    TEST_ASSERT_EQUAL(0, err);
     err = fsst->set_finalize(handle);
 
     /* FAIL SET_Add_Data - final size smaller than set at start */
@@ -391,12 +385,12 @@ void test_file_system_store_edge_cases()
     err = fsst->set_add_data(handle, "abcde12345", 5);
     err = fsst->set_add_data(handle, "abcde12345", 3);
     err = fsst->set_finalize(handle);
-    TEST_ASSERT_NOT_EQUAL(0, err);
+    TEST_ASSERT_EQUAL(0, err);
 
     err = fsst->deinit();
     TEST_ASSERT_EQUAL(0, err);
 
-    err = bd.deinit();
+    err = bd->deinit();
     TEST_ASSERT_EQUAL(0, err);
 }
 
@@ -406,20 +400,19 @@ void test_file_system_store_multi_threads()
 
     utest_printf("\nTest Multi Threaded FileSystemStore Set Starts..\n");
 
-    int err = bd.init();
+    int err = bd->init();
     TEST_ASSERT_EQUAL(0, err);
 
-    LittleFileSystem fs("lfs", &bd);
-    //FATFileSystem fs("fatfs", &bd);
+    FileSystem *fs = FileSystem::get_default_instance();
 
-    err = fs.mount(&bd);
+    err = fs->mount(bd);
 
     if (err) {
-        err = fs.reformat(&bd);
+        err = fs->reformat(bd);
         TEST_ASSERT_EQUAL(0, err);
     }
 
-    FileSystemStore *fsst = new FileSystemStore(&fs);
+    FileSystemStore *fsst = new FileSystemStore(fs);
 
     err = fsst->init();
     TEST_ASSERT_EQUAL(0, err);
@@ -467,7 +460,7 @@ void test_file_system_store_multi_threads()
     err = fsst->deinit();
     TEST_ASSERT_EQUAL(0, err);
 
-    err = bd.deinit();
+    err = bd->deinit();
     TEST_ASSERT_EQUAL(0, err);
 }
 
