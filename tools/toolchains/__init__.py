@@ -19,7 +19,7 @@ from __future__ import print_function, division, absolute_import
 import re
 import sys
 import json
-from os import stat, walk, getcwd, sep, remove
+from os import stat, walk, getcwd, sep, remove, getenv
 from copy import copy
 from time import time, sleep
 from shutil import copyfile
@@ -48,6 +48,8 @@ CPU_COUNT_MIN = 1
 CPU_COEF = 1
 
 class mbedToolchain:
+    OFFICIALLY_SUPPORTED = False
+
     # Verbose logging
     VERBOSE = True
 
@@ -126,7 +128,7 @@ class mbedToolchain:
 
         # Build output dir
         self.build_dir = abspath(build_dir) if PRINT_COMPILER_OUTPUT_AS_LINK else build_dir
-        self.timestamp = time()
+        self.timestamp = getenv("MBED_BUILD_TIMESTAMP",time())
 
         # Number of concurrent build jobs. 0 means auto (based on host system cores)
         self.jobs = 0
@@ -620,8 +622,11 @@ class mbedToolchain:
         objects = sorted(set(r.get_file_paths(FileType.OBJECT)))
         config_file = ([self.config.app_config_location]
                        if self.config.app_config_location else [])
-        linker_script = [path for _, path in r.get_file_refs(FileType.LD_SCRIPT)
-                         if path.endswith(self.LINKER_EXT)][-1]
+        try:
+            linker_script = [path for _, path in r.get_file_refs(FileType.LD_SCRIPT)
+                             if path.endswith(self.LINKER_EXT)][-1]
+        except IndexError:
+            raise NotSupportedException("No linker script found")
         lib_dirs = r.get_file_paths(FileType.LIB_DIR)
         libraries = [l for l in r.get_file_paths(FileType.LIB)
                      if l.endswith(self.LIBRARY_EXT)]

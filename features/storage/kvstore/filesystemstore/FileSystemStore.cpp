@@ -44,7 +44,6 @@ using namespace mbed;
 // Local Functions
 static char *string_ndup(const char *src, size_t size);
 
-
 // Class Functions
 FileSystemStore::FileSystemStore(FileSystem *fs) : _fs(fs),
     _is_initialized(false)
@@ -60,6 +59,7 @@ int FileSystemStore::init()
 
     _cfg_fs_path_size = strlen(FSST_FOLDER_PATH);
     _cfg_fs_path = string_ndup(FSST_FOLDER_PATH, _cfg_fs_path_size);
+
     _full_path_key = new char[_cfg_fs_path_size + KVStore::MAX_KEY_SIZE + 1];
     memset(_full_path_key, 0, (_cfg_fs_path_size + KVStore::MAX_KEY_SIZE + 1));
     strncpy(_full_path_key, _cfg_fs_path, _cfg_fs_path_size);
@@ -349,6 +349,7 @@ int FileSystemStore::set_start(set_handle_t *handle, const char *key, size_t fin
     set_handle->data_size = final_data_size;
     key_len = strnlen(key, KVStore::MAX_KEY_SIZE);
     set_handle->key = string_ndup(key, key_len);
+
     *handle = (set_handle_t)set_handle;
 
     key_metadata.magic = FSST_MAGIC;
@@ -606,6 +607,5 @@ static char *string_ndup(const char *src, size_t size)
     string_copy[size] = '\0';
     return string_copy;
 }
-
 
 

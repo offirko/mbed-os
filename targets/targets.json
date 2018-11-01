@@ -21,6 +21,10 @@
                 "help": "Default network interface type. Typical options: null, ETHERNET, WIFI, CELLULAR, MESH",
                 "value": null
             },
+            "deep-sleep-latency": {
+                "help": "Time in ms required to go to and wake up from deep sleep (max 10)",
+                "value": 0
+            },
             "boot-stack-size": {
                 "help": "Define the boot stack size in bytes. This value must be a multiple of 8",
                 "value": "0x1000"
@@ -574,13 +578,14 @@
         "is_disk_virtual": true,
         "inherits": ["Target"],
         "detect_code": ["0218"],
-        "device_has": ["USTICKER", "LPTICKER", "RTC", "ANALOGIN", "ANALOGOUT", "I2C", "I2CSLAVE", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "SEMIHOST", "SERIAL", "SLEEP", "SPI", "SPISLAVE", "STDIO_MESSAGES", "TRNG", "FLASH"],
+        "device_has": ["USTICKER", "LPTICKER", "RTC", "ANALOGIN", "ANALOGOUT", "I2C", "I2CSLAVE", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "SEMIHOST", "SERIAL", "SLEEP", "SPI", "SPISLAVE", "STDIO_MESSAGES", "TRNG", "FLASH", "QSPI"],
         "release_versions": ["2", "5"],
         "device_name": "MKL82Z128xxx7"
     },
     "USENSE": {
         "inherits": ["KL82Z"],
         "extra_labels_remove": ["FRDM"],
+        "device_has_remove": ["QSPI"],
         "supported_form_factors": []
     },
     "KW24D": {
@@ -632,7 +637,7 @@
     },
     "K64F": {
         "supported_form_factors": ["ARDUINO"],
-        "components": ["SD"],
+        "components": ["SD", "SPIF", "FLASHIAP"],
         "core": "Cortex-M4F",
         "supported_toolchains": ["ARM", "GCC_ARM", "IAR"],
         "extra_labels": ["Freescale", "MCUXpresso_MCUS", "KSDK2_MCUS", "FRDM", "KPSDK_MCUS", "KPSDK_CODE", "MCU_K64F", "Freescale_EMAC"],
@@ -706,8 +711,33 @@
         "device_name": "MK64FN1M0xxx12",
         "bootloader_supported": true
     },
+    "RAPIDIOT": {
+        "inherits": ["Target"],
+        "public": false,
+        "core": "null",
+        "supported_toolchains": ["ARM", "GCC_ARM", "IAR"],
+        "macros": ["FSL_RTOS_MBED", "USE_EXTERNAL_RTC"],
+        "default_toolchain": "ARM",
+        "default_lib": "std",
+        "release_versions": ["2", "5"]
+    },
+    "RAPIDIOT_K64F": {
+        "inherits": ["RAPIDIOT"],
+        "core": "Cortex-M4F",
+        "extra_labels": ["Freescale", "MCUXpresso_MCUS", "KSDK2_MCUS", "MCU_K64F"],
+        "macros_add": ["CPU_MK64FN1M0VMD12", "TARGET_K64F"],
+        "is_disk_virtual": true,
+        "mbed_rom_start": "0x00014000",
+        "mbed_rom_size": "0xEC000",
+        "detect_code": ["0228"],
+        "device_has": ["USTICKER", "LPTICKER", "ANALOGIN", "ANALOGOUT", "I2C", "I2CSLAVE", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "SERIAL", "SERIAL_ASYNCH", "SERIAL_FC", "SLEEP", "SPI", "SPI_ASYNCH", "SPISLAVE", "STDIO_MESSAGES", "TRNG", "FLASH"],
+        "forced_reset_timeout": 7,
+        "device_name": "MK64FN1M0xxx12",
+        "bootloader_supported": true
+    },
     "K66F": {
         "supported_form_factors": ["ARDUINO"],
+        "components": ["SD"],
         "core": "Cortex-M4F",
         "supported_toolchains": ["ARM", "GCC_ARM", "IAR"],
         "extra_labels": ["Freescale", "MCUXpresso_MCUS", "KSDK2_MCUS", "FRDM", "Freescale_EMAC"],
@@ -733,7 +763,7 @@
         "macros": ["CPU_MK82FN256VDC15", "FSL_RTOS_MBED"],
         "inherits": ["Target"],
         "detect_code": ["0217"],
-        "device_has": ["USTICKER", "LPTICKER", "RTC", "ANALOGIN", "ANALOGOUT", "I2C", "I2CSLAVE", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "SERIAL", "SLEEP", "SPI", "SPISLAVE", "STDIO_MESSAGES", "TRNG", "FLASH"],
+        "device_has": ["USTICKER", "LPTICKER", "RTC", "ANALOGIN", "ANALOGOUT", "I2C", "I2CSLAVE", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "SERIAL", "SLEEP", "SPI", "SPISLAVE", "STDIO_MESSAGES", "TRNG", "FLASH", "QSPI"],
         "release_versions": ["2", "5"],
         "device_name": "MK82FN256xxx15"
     },
@@ -741,6 +771,7 @@
         "inherits": ["K82F"],
         "extra_labels_remove": ["FRDM"],
         "components_remove": ["SPIF"],
+        "device_has_remove": ["QSPI"],
         "supported_form_factors": []
     },
     "FAMILY_STM32": {
@@ -796,6 +827,7 @@
         "detect_code": ["1054"],
         "device_has": ["USTICKER", "RTC", "ANALOGIN", "I2C", "I2CSLAVE", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "SERIAL", "SLEEP", "SPI", "SPISLAVE", "STDIO_MESSAGES", "FLASH"],
         "release_versions": ["2", "5"],
+        "post_binary_hook": {"function": "LPCTargetCode.lpc_patch"},
         "device_name" : "LPC54114J256BD64"
     },
     "MCU_LPC546XX": {
@@ -807,6 +839,7 @@
         "inherits": ["Target"],
         "device_has": ["USTICKER", "RTC", "ANALOGIN", "EMAC", "I2C", "I2CSLAVE", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "SERIAL", "SLEEP", "SPI", "SPISLAVE", "STDIO_MESSAGES", "FLASH", "TRNG"],
         "device_name" : "LPC54628J512ET180",
+        "post_binary_hook": {"function": "LPCTargetCode.lpc_patch"},
         "overrides": {
             "network-default-interface-type": "ETHERNET"
         }
@@ -1243,6 +1276,7 @@
         }
     },
     "DISCO_F413ZH": {
+        "components": ["QSPIF"],
         "inherits": ["FAMILY_STM32"],
         "supported_form_factors": ["ARDUINO"],
         "core": "Cortex-M4F",
@@ -1261,6 +1295,7 @@
         "detect_code": ["0743"],
         "macros_add": ["USB_STM_HAL", "USBHOST_OTHER"],
         "device_has_add": ["ANALOGOUT", "CAN", "SERIAL_ASYNCH", "SERIAL_FC", "TRNG", "FLASH", "QSPI"],
+        "bootloader_supported": true,
         "release_versions": ["2", "5"],
         "device_name": "STM32F413ZH"
     },
@@ -1283,6 +1318,7 @@
         "detect_code": ["0743"],
         "macros_add": ["USB_STM_HAL", "USBHOST_OTHER"],
         "device_has_add": ["ANALOGOUT", "CAN", "SERIAL_ASYNCH", "SERIAL_FC", "TRNG", "FLASH"],
+        "bootloader_supported": true,
         "release_versions": ["2", "5"],
         "device_name": "STM32F413ZH"
     },
@@ -1745,6 +1781,7 @@
         "device_name": "STM32L486RG"
     },
     "MTB_ADV_WISE_1570": {
+        "components": ["FLASHIAP"],
         "inherits": ["FAMILY_STM32"],
         "core": "Cortex-M4F",
         "extra_labels_add": ["STM32L4", "STM32L486RG", "STM32L486xG", "WISE_1570"],
@@ -1772,7 +1809,7 @@
         "supported_toolchains": ["ARM", "uARM", "GCC_ARM"],
         "program_cycle_s": 2,
         "extra_labels_add": ["STM32F4", "STM32F407", "STM32F407xG", "STM32F407VG"],
-        "device_has_add": ["ANALOGOUT"],
+        "device_has_add": ["ANALOGOUT", "TRNG"],
         "release_versions": ["2"],
         "device_name": "STM32F407VG"
     },
@@ -1884,7 +1921,7 @@
         },
         "macros_add": ["USB_STM_HAL"],
         "overrides": {"lse_available": 0},
-        "device_has_add": ["ANALOGOUT"],
+        "device_has_add": ["ANALOGOUT", "TRNG"],
         "release_versions": ["2", "5"],
         "device_name": "STM32F407VG"
     },
@@ -1912,6 +1949,7 @@
         "bootloader_supported": true
     },
     "DISCO_F469NI": {
+        "components": ["QSPIF"],
         "inherits": ["FAMILY_STM32"],
         "supported_form_factors": ["ARDUINO"],
         "core": "Cortex-M4F",
@@ -2045,6 +2083,7 @@
         }
     },
     "DISCO_L475VG_IOT01A": {
+        "components": ["QSPIF"],
         "inherits": ["FAMILY_STM32"],
         "core": "Cortex-M4F",
         "extra_labels_add": ["STM32L4", "STM32L475xG", "STM32L475VG"],
@@ -2068,6 +2107,7 @@
         "bootloader_supported": true
     },
     "DISCO_L476VG": {
+        "components": ["QSPIF"],
         "inherits": ["FAMILY_STM32"],
         "core": "Cortex-M4F",
         "extra_labels_add": ["STM32L4", "STM32L476xG", "STM32L476VG"],
@@ -2165,7 +2205,7 @@
         "device_has_add": ["ANALOGOUT", "CAN", "SERIAL_ASYNCH", "SERIAL_FC", "TRNG", "FLASH"],
         "release_versions": ["2", "5"],
         "device_name": "STM32L471QG",
-        "bootloader_supported": true        
+        "bootloader_supported": true
     },
     "MTB_MTS_DRAGONFLY": {
         "inherits": ["FAMILY_STM32"],
@@ -2273,13 +2313,21 @@
     "MODULE_UBLOX_ODIN_W2": {
         "inherits": ["FAMILY_STM32"],
         "core": "Cortex-M4F",
-        "extra_labels_add": ["STM32F4", "STM32F439", "STM32F439ZI","STM32F439xx", "STM32F439xI", "STM_EMAC"],
+        "extra_labels_add": ["STM32F4", "STM32F439", "STM32F439ZI","STM32F439xx", "STM32F439xI", "STM_EMAC","CORDIO", "CORDIO_ODIN_W2"],
         "macros": ["MBEDTLS_CONFIG_HW_SUPPORT", "HSE_VALUE=24000000", "HSE_STARTUP_TIMEOUT=5000", "CB_INTERFACE_SDIO","CB_CHIP_WL18XX","SUPPORT_80211D_ALWAYS","WLAN_ENABLED","CB_FEATURE_802DOT11W","CB_FEATURE_802DOT11R","MBEDTLS_ARC4_C","MBEDTLS_DES_C","MBEDTLS_MD4_C","MBEDTLS_MD5_C","MBEDTLS_SHA1_C"],
-        "device_has_add": ["CAN", "EMAC", "TRNG", "FLASH", "WIFI"],
+        "device_has_add": ["CAN", "EMAC", "TRNG", "FLASH", "WIFI", "SERIAL_FC", "SERIAL"],
+        "features": ["BLE"],
         "device_has_remove": [],
         "device_name": "STM32F439ZI",
         "public": false,
         "bootloader_supported": true,
+        "config": {
+            "BLE_STACK_UBX": {
+                "help": "It should be set to true to enable ublox ODIN own stack/driver rather than CORDIO",
+                "value": false,
+                "macro_name": "BLE_STACK_UBX"
+            }
+        },
         "overrides": {
             "network-default-interface-type": "WIFI"
         }
@@ -3976,6 +4024,17 @@
         "release_versions": ["5"],
         "device_name": "nRF52840_xxAA"
     },
+    "MTB_LAIRD_BL654": {
+        "inherits": ["MCU_NRF52840"],
+        "release_versions": ["5"],
+        "device_name": "nRF52840_xxAA",
+        "detect_code": ["0465"],
+        "features_remove": ["CRYPTOCELL310"],
+        "macros_remove":  ["MBEDTLS_CONFIG_HW_SUPPORT"],
+        "overrides": {
+            "lf_clock_src": "NRF_LF_SRC_RC"
+        }
+    },
     "BLUEPILL_F103C8": {
         "inherits": ["FAMILY_STM32"],
         "core": "Cortex-M3",
@@ -4224,7 +4283,8 @@
         "detect_code": ["0822"],
         "device_has_add": ["ANALOGOUT", "CAN", "CRC", "SERIAL_ASYNCH", "SERIAL_FC", "TRNG", "FLASH"],
         "release_versions": ["2", "5"],
-        "device_name": "STM32L496AG"
+        "device_name": "STM32L496AG",
+        "bootloader_supported": true
     },
     "NUCLEO_L496ZG": {
         "inherits": ["FAMILY_STM32"],
@@ -4245,7 +4305,8 @@
         "detect_code": ["0823"],
         "device_has_add": ["ANALOGOUT", "CAN", "CRC", "SERIAL_ASYNCH", "SERIAL_FC", "TRNG", "FLASH"],
         "release_versions": ["2", "5"],
-        "device_name": "STM32L496ZG"
+        "device_name": "STM32L496ZG",
+        "bootloader_supported": true
     },
     "NUCLEO_L496ZG_P": {
         "inherits": ["NUCLEO_L496ZG"],
@@ -4365,7 +4426,7 @@
         "extra_labels": ["TOSHIBA"],
         "macros": ["__TMPM46B__"],
         "supported_toolchains": ["GCC_ARM", "ARM", "IAR"],
-        "device_has": ["ANALOGIN", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "SERIAL", "SERIAL_FC", "SPI", "I2C", "STDIO_MESSAGES", "TRNG", "FLASH", "SLEEP"],
+        "device_has": ["USTICKER", "ANALOGIN", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "SERIAL", "SERIAL_FC", "SPI", "I2C", "STDIO_MESSAGES", "TRNG", "FLASH", "SLEEP"],
         "device_name": "TMPM46BF10FG",
         "detect_code": ["7013"],
         "release_versions": ["5"],
@@ -4458,5 +4519,18 @@
         "device_name": "TMPM3H6FWFG",
         "detect_code": ["7012"],
         "release_versions": ["5"]
+    },
+    "TMPM4G9": {
+        "inherits": ["Target"],
+        "core": "Cortex-M4",
+        "is_disk_virtual": true,
+        "extra_labels": ["TOSHIBA"],
+        "macros": ["__TMPM4G9__"],
+        "supported_toolchains": ["GCC_ARM", "ARM", "IAR"],
+        "device_has": ["ANALOGIN", "ANALOGOUT", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "SERIAL", "SPI", "I2C", "I2CSLAVE", "STDIO_MESSAGES", "FLASH", "SLEEP", "USTICKER"],
+        "device_name": "TMPM4G9F15FG",
+        "detect_code": ["7016"],
+        "release_versions": ["5"],
+        "bootloader_supported": true
     }
 }

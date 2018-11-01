@@ -123,7 +123,10 @@ int BufferedBlockDevice::read(void *b, bd_addr_t addr, bd_size_t size)
 
     if (aligned_addr != _curr_aligned_addr) {
         // Need to flush if moved to another program unit
-        flush();
+        int ret = flush();
+        if (ret) {
+            return ret;
+        }
         _curr_aligned_addr = aligned_addr;
         moved_unit = true;
     }

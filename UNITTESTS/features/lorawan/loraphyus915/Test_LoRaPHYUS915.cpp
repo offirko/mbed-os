@@ -19,62 +19,104 @@
 #include "LoRaPHYUS915.h"
 #include "LoRaPHY_stub.h"
 
-class my_radio : public LoRaRadio
-{
+class my_radio : public LoRaRadio {
 public:
 
-    virtual void init_radio(radio_events_t *events){};
+    virtual void init_radio(radio_events_t *events)
+    {
+    };
 
-    virtual void radio_reset(){};
+    virtual void radio_reset()
+    {
+    };
 
-    virtual void sleep(void){};
+    virtual void sleep(void)
+    {
+    };
 
-    virtual void standby(void){};
+    virtual void standby(void)
+    {
+    };
 
-    virtual void set_rx_config (radio_modems_t modem, uint32_t bandwidth,
-                                   uint32_t datarate, uint8_t coderate,
-                                   uint32_t bandwidth_afc, uint16_t preamble_len,
-                                   uint16_t symb_timeout, bool fix_len,
-                                   uint8_t payload_len,
-                                   bool crc_on, bool freq_hop_on, uint8_t hop_period,
-                                   bool iq_inverted, bool rx_continuous){};
+    virtual void set_rx_config(radio_modems_t modem, uint32_t bandwidth,
+                               uint32_t datarate, uint8_t coderate,
+                               uint32_t bandwidth_afc, uint16_t preamble_len,
+                               uint16_t symb_timeout, bool fix_len,
+                               uint8_t payload_len,
+                               bool crc_on, bool freq_hop_on, uint8_t hop_period,
+                               bool iq_inverted, bool rx_continuous)
+    {
+    };
 
     virtual void set_tx_config(radio_modems_t modem, int8_t power, uint32_t fdev,
-                                  uint32_t bandwidth, uint32_t datarate,
-                                  uint8_t coderate, uint16_t preamble_len,
-                                  bool fix_len, bool crc_on, bool freq_hop_on,
-                                  uint8_t hop_period, bool iq_inverted, uint32_t timeout){};
+                               uint32_t bandwidth, uint32_t datarate,
+                               uint8_t coderate, uint16_t preamble_len,
+                               bool fix_len, bool crc_on, bool freq_hop_on,
+                               uint8_t hop_period, bool iq_inverted, uint32_t timeout)
+    {
+    };
 
-    virtual void send(uint8_t *buffer, uint8_t size){};
+    virtual void send(uint8_t *buffer, uint8_t size)
+    {
+    };
 
-    virtual void receive(void){};
+    virtual void receive(void)
+    {
+    };
 
-    virtual void set_channel(uint32_t freq){};
+    virtual void set_channel(uint32_t freq)
+    {
+    };
 
-    virtual uint32_t random(void){};
+    virtual uint32_t random(void)
+    {
+    };
 
-    virtual uint8_t get_status(void){return uint8_value;};
+    virtual uint8_t get_status(void)
+    {
+        return uint8_value;
+    };
 
-    virtual void set_max_payload_length(radio_modems_t modem, uint8_t max){};
+    virtual void set_max_payload_length(radio_modems_t modem, uint8_t max)
+    {
+    };
 
-    virtual void set_public_network(bool enable){};
+    virtual void set_public_network(bool enable)
+    {
+    };
 
-    virtual uint32_t time_on_air(radio_modems_t modem, uint8_t pkt_len){};
+    virtual uint32_t time_on_air(radio_modems_t modem, uint8_t pkt_len)
+    {
+    };
 
     virtual bool perform_carrier_sense(radio_modems_t modem,
-                                           uint32_t freq,
-                                           int16_t rssi_threshold,
-                                           uint32_t max_carrier_sense_time){ return bool_value;};
+                                       uint32_t freq,
+                                       int16_t rssi_threshold,
+                                       uint32_t max_carrier_sense_time)
+    {
+        return bool_value;
+    };
 
-    virtual void start_cad(void){};
+    virtual void start_cad(void)
+    {
+    };
 
-    virtual bool check_rf_frequency(uint32_t frequency){ return bool_value; };
+    virtual bool check_rf_frequency(uint32_t frequency)
+    {
+        return bool_value;
+    };
 
-    virtual void set_tx_continuous_wave(uint32_t freq, int8_t power, uint16_t time){};
+    virtual void set_tx_continuous_wave(uint32_t freq, int8_t power, uint16_t time)
+    {
+    };
 
-    virtual void lock(void){};
+    virtual void lock(void)
+    {
+    };
 
-    virtual void unlock(void){};
+    virtual void unlock(void)
+    {
+    };
 
     bool bool_value;
     uint8_t uint8_value;
@@ -111,6 +153,7 @@ TEST_F(Test_LoRaPHYUS915, restore_default_channels)
 TEST_F(Test_LoRaPHYUS915, rx_config)
 {
     rx_config_params_t p;
+    memset(&p, 0, sizeof(p));
 
     radio.uint8_value = 1;
     EXPECT_TRUE(!object->rx_config(&p));
@@ -126,18 +169,20 @@ TEST_F(Test_LoRaPHYUS915, rx_config)
 TEST_F(Test_LoRaPHYUS915, tx_config)
 {
     tx_config_params_t p;
-    int8_t tx;
-    lorawan_time_t time;
+    memset(&p, 0, sizeof(p));
+    int8_t tx = 0;
+    lorawan_time_t time = 0;
     EXPECT_TRUE(object->tx_config(&p, &tx, &time));
 }
 
 TEST_F(Test_LoRaPHYUS915, link_ADR_request)
 {
     adr_req_params_t params;
-    int8_t dr_out;
-    int8_t tx_power_out;
-    uint8_t nb_rep_out;
-    uint8_t nb_bytes_parsed;
+    memset(&params, 0, sizeof(params));
+    int8_t dr_out = 0;
+    int8_t tx_power_out = 0;
+    uint8_t nb_rep_out = 0;
+    uint8_t nb_bytes_parsed = 0;
 
     EXPECT_TRUE(0 == object->link_ADR_request(&params, &dr_out, &tx_power_out, &nb_rep_out, &nb_bytes_parsed));
 
@@ -164,6 +209,8 @@ TEST_F(Test_LoRaPHYUS915, link_ADR_request)
 TEST_F(Test_LoRaPHYUS915, accept_rx_param_setup_req)
 {
     rx_param_setup_req_t p;
+    memset(&p, 0, sizeof(p));
+    radio.bool_value = false;
     EXPECT_TRUE(0 == object->accept_rx_param_setup_req(&p));
 
     radio.bool_value = true;
@@ -188,9 +235,10 @@ TEST_F(Test_LoRaPHYUS915, get_alternate_DR)
 TEST_F(Test_LoRaPHYUS915, set_next_channel)
 {
     channel_selection_params_t params;
-    uint8_t channel;
-    lorawan_time_t time;
-    lorawan_time_t timeoff;
+    memset(&params, 0, sizeof(params));
+    uint8_t channel = 0;
+    lorawan_time_t time = 0;
+    lorawan_time_t timeoff = 0;
 
     params.current_datarate = 4;
     params.aggregate_timeoff = 0;
@@ -215,11 +263,15 @@ TEST_F(Test_LoRaPHYUS915, apply_DR_offset)
     //13, 13, 12, 11
 
     for (int i = 0; i < 5; i++) {
-        for (int j=0; j < 4; j++ ) {
+        for (int j = 0; j < 4; j++) {
             uint8_t val = 10 + i;
             val -= j;
-            if (val > 13) val = 13;
-            if (val < 8) val = 8;
+            if (val > 13) {
+                val = 13;
+            }
+            if (val < 8) {
+                val = 8;
+            }
             EXPECT_TRUE(val == object->apply_DR_offset(i, j));
         }
     }
@@ -228,6 +280,7 @@ TEST_F(Test_LoRaPHYUS915, apply_DR_offset)
 TEST_F(Test_LoRaPHYUS915, set_tx_cont_mode)
 {
     cw_mode_params_t p;
+    memset(&p, 0, sizeof(p));
     object->set_tx_cont_mode(&p, 0);
 
     p.datarate = 4;

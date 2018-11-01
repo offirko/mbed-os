@@ -193,6 +193,7 @@ void test_file_system_store_functionality_unit_test()
 
     err = fsst->deinit();
     TEST_ASSERT_EQUAL(0, err);
+
     err = bd->deinit();
     TEST_ASSERT_EQUAL(0, err);
 }
@@ -209,7 +210,6 @@ void test_file_system_store_edge_cases()
     char kv_value2[64] = {"value2value2value2value2value2value2"};
     char kv_buf[64] = {0};
     char kv_name[16] = {0};
-
 
     int err = bd->init();
     TEST_ASSERT_EQUAL(0, err);
@@ -378,6 +378,7 @@ void test_file_system_store_edge_cases()
     TEST_ASSERT_NOT_EQUAL(0, err);
     err = fsst->set_add_data(handle, "abcde12345", 5);
     TEST_ASSERT_EQUAL(0, err);
+
     err = fsst->set_finalize(handle);
 
     /* FAIL SET_Add_Data - final size smaller than set at start */

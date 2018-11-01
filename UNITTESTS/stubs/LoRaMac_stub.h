@@ -22,12 +22,12 @@
 #include "lorawan_types.h"
 #include "lorawan_data_structures.h"
 
-namespace LoRaMac_stub
-{
+namespace LoRaMac_stub {
 extern bool bool_value;
 extern int bool_false_counter;
 extern int bool_true_counter;
 extern int int_value;
+extern uint8_t uint8_value;
 extern rx_slot_t slot_value;
 extern lorawan_status_t status_value;
 extern loramac_mcps_confirm_t *mcps_conf_ptr;
@@ -35,6 +35,5 @@ extern loramac_mcps_indication_t *mcps_ind_ptr;
 extern loramac_mlme_confirm_t *mlme_conf_ptr;
 extern loramac_mlme_indication_t *mlme_ind_ptr;
 extern device_class_t dev_class_value;
-extern mbed::Callback<void(void)> _ack_expiry_handler_for_class_c;
 extern mbed::Callback<void(void)> _scheduling_failure_handler;
 }

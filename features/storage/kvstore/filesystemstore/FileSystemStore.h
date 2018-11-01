@@ -204,7 +204,9 @@ private:
 
 private:
     FileSystem *_fs;
+    // Lock so that Only a single key file can be incrementaly editted at a time
     PlatformMutex _mutex;
+    // Single key incrementally edited, can be edited from multiple threads - lock to protect
     PlatformMutex _inc_data_add_mutex;
 
     bool _is_initialized;

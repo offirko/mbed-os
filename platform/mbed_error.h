@@ -42,7 +42,7 @@ extern "C" {
 #else //MBED_CONF_PLATFORM_MAX_ERROR_FILENAME_LEN
 #if MBED_CONF_PLATFORM_MAX_ERROR_FILENAME_LEN > 64
 //We have to limit this to 64 bytes since we use mbed_error_printf for error reporting
-//and mbed_error_vfprintf uses 128bytes internal buffer which may not be sufficient for anything
+//and mbed_error_vprintf uses 128bytes internal buffer which may not be sufficient for anything
 //longer that 64 bytes with the current implementation.
 #error "Unsupported error filename buffer length detected, max supported length is 64 chars. Please change MBED_CONF_PLATFORM_MAX_ERROR_FILENAME_LEN or max-error-filename-len in configuration."
 #endif
@@ -169,8 +169,7 @@ typedef int mbed_error_status_t;
  * @param  error_status     mbed_error_status_t status to be set(See mbed_error_status_t enum above for available error status values).
  * @param  error_msg        The error message to be printed out to STDIO/Serial.
  * @param  error_value      Value associated with the error status. This would depend on error code/error scenario. Only available with MBED_ERROR1
- * @return                  0 or MBED_SUCCESS.
- *                          MBED_ERROR_INVALID_ARGUMENT if called with invalid error status/codes
+ * @return                  Does not return
  *
  * @code
  *
@@ -533,6 +532,9 @@ typedef enum _mbed_module_type {
     BLE_NO_FRAME_INITIALIZED,  321      BLE No frame initialized
     BLE_BACKEND_CREATION_FAILED 322     BLE Backend creation failed
     BLE_BACKEND_NOT_INITIALIZED 323     BLE Backend not initialized
+    ASSERTION_FAILED           324      Assertion Failed
+    AUTHENTICATION_FAILED      325      Authentication Failed
+    RBP_AUTHENTICATION_FAILED  326      Rollback Protect Authentication Failed
     \endverbatim
  *
  *  @note
@@ -783,7 +785,10 @@ typedef enum _mbed_error_code {
     MBED_DEFINE_SYSTEM_ERROR(BLE_NO_FRAME_INITIALIZED, 65),             /* 321      BLE No frame initialized */
     MBED_DEFINE_SYSTEM_ERROR(BLE_BACKEND_CREATION_FAILED, 66),          /* 322      BLE Backend creation failed */
     MBED_DEFINE_SYSTEM_ERROR(BLE_BACKEND_NOT_INITIALIZED, 67),          /* 323      BLE Backend not initialized */
-
+    MBED_DEFINE_SYSTEM_ERROR(ASSERTION_FAILED, 68),                     /* 324      Assertion Failed */
+    MBED_DEFINE_SYSTEM_ERROR(AUTHENTICATION_FAILED, 69),                /* 325      Authentication Failed */
+    MBED_DEFINE_SYSTEM_ERROR(RBP_AUTHENTICATION_FAILED, 70),            /* 326      Rollback Protection Authentication Failed */
+    
     //Everytime you add a new system error code, you must update
     //Error documentation under Handbook to capture the info on
     //the new error status/codes
@@ -871,7 +876,7 @@ typedef struct _mbed_error_ctx {
  *
  */
 
-void error(const char *format, ...);
+MBED_NORETURN void error(const char *format, ...);
 
 /**
  * Call this Macro to generate a mbed_error_status_t value for a System error
@@ -978,8 +983,7 @@ int mbed_get_error_count(void);
  * @param  error_value      Value associated with the error status. This would depend on error code/error scenario.
  * @param  filename         Name of the source file originating the error( Most callers can pass __FILE__ here ).
  * @param  line_number      The line number of the source file originating the error( Most callers can pass __LINE__ here ) .
- * @return                  0 or MBED_SUCCESS.
- *                          MBED_ERROR_INVALID_ARGUMENT if called with invalid error status/codes
+ * @return                  Does not return.
  *
  * @code
  *
@@ -989,7 +993,7 @@ int mbed_get_error_count(void);
  *
  * @note See MBED_WARNING/MBED_ERROR macros which provides a wrapper on this API
  */
-mbed_error_status_t mbed_error(mbed_error_status_t error_status, const char *error_msg, unsigned int error_value, const char *filename, int line_number);
+MBED_NORETURN mbed_error_status_t mbed_error(mbed_error_status_t error_status, const char *error_msg, unsigned int error_value, const char *filename, int line_number);
 
 /**
  * Registers an application defined error callback with the error handling system.

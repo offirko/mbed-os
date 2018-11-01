@@ -28,12 +28,15 @@ static uint8_t batt_level = 0;
 
 using namespace events;
 
-class my_LoRaPHY : public LoRaPHY
-{
+class my_LoRaPHY : public LoRaPHY {
 public:
-    my_LoRaPHY(){};
+    my_LoRaPHY()
+    {
+    };
 
-    virtual ~my_LoRaPHY(){};
+    virtual ~my_LoRaPHY()
+    {
+    };
 };
 
 uint8_t my_cb()
@@ -41,63 +44,106 @@ uint8_t my_cb()
     return 1;
 }
 
-class my_radio : public LoRaRadio
-{
+class my_radio : public LoRaRadio {
 public:
     radio_events_t *_ev;
 
-    virtual void init_radio(radio_events_t *events){_ev = events;};
+    virtual void init_radio(radio_events_t *events)
+    {
+        _ev = events;
+    };
 
-    virtual void radio_reset(){};
+    virtual void radio_reset()
+    {
+    };
 
-    virtual void sleep(void){};
+    virtual void sleep(void)
+    {
+    };
 
-    virtual void standby(void){};
+    virtual void standby(void)
+    {
+    };
 
-    virtual void set_rx_config (radio_modems_t modem, uint32_t bandwidth,
-                                   uint32_t datarate, uint8_t coderate,
-                                   uint32_t bandwidth_afc, uint16_t preamble_len,
-                                   uint16_t symb_timeout, bool fix_len,
-                                   uint8_t payload_len,
-                                   bool crc_on, bool freq_hop_on, uint8_t hop_period,
-                                   bool iq_inverted, bool rx_continuous){};
+    virtual void set_rx_config(radio_modems_t modem, uint32_t bandwidth,
+                               uint32_t datarate, uint8_t coderate,
+                               uint32_t bandwidth_afc, uint16_t preamble_len,
+                               uint16_t symb_timeout, bool fix_len,
+                               uint8_t payload_len,
+                               bool crc_on, bool freq_hop_on, uint8_t hop_period,
+                               bool iq_inverted, bool rx_continuous)
+    {
+    };
 
     virtual void set_tx_config(radio_modems_t modem, int8_t power, uint32_t fdev,
-                                  uint32_t bandwidth, uint32_t datarate,
-                                  uint8_t coderate, uint16_t preamble_len,
-                                  bool fix_len, bool crc_on, bool freq_hop_on,
-                                  uint8_t hop_period, bool iq_inverted, uint32_t timeout){};
+                               uint32_t bandwidth, uint32_t datarate,
+                               uint8_t coderate, uint16_t preamble_len,
+                               bool fix_len, bool crc_on, bool freq_hop_on,
+                               uint8_t hop_period, bool iq_inverted, uint32_t timeout)
+    {
+    };
 
-    virtual void send(uint8_t *buffer, uint8_t size){};
+    virtual void send(uint8_t *buffer, uint8_t size)
+    {
+    };
 
-    virtual void receive(void){};
+    virtual void receive(void)
+    {
+    };
 
-    virtual void set_channel(uint32_t freq){};
+    virtual void set_channel(uint32_t freq)
+    {
+    };
 
-    virtual uint32_t random(void){};
+    virtual uint32_t random(void)
+    {
+    };
 
-    virtual uint8_t get_status(void){return uint8_value;};
+    virtual uint8_t get_status(void)
+    {
+        return uint8_value;
+    };
 
-    virtual void set_max_payload_length(radio_modems_t modem, uint8_t max){};
+    virtual void set_max_payload_length(radio_modems_t modem, uint8_t max)
+    {
+    };
 
-    virtual void set_public_network(bool enable){};
+    virtual void set_public_network(bool enable)
+    {
+    };
 
-    virtual uint32_t time_on_air(radio_modems_t modem, uint8_t pkt_len){};
+    virtual uint32_t time_on_air(radio_modems_t modem, uint8_t pkt_len)
+    {
+    };
 
     virtual bool perform_carrier_sense(radio_modems_t modem,
-                                           uint32_t freq,
-                                           int16_t rssi_threshold,
-                                           uint32_t max_carrier_sense_time){ return bool_value;};
+                                       uint32_t freq,
+                                       int16_t rssi_threshold,
+                                       uint32_t max_carrier_sense_time)
+    {
+        return bool_value;
+    };
 
-    virtual void start_cad(void){};
+    virtual void start_cad(void)
+    {
+    };
 
-    virtual bool check_rf_frequency(uint32_t frequency){ return bool_value; };
+    virtual bool check_rf_frequency(uint32_t frequency)
+    {
+        return bool_value;
+    };
 
-    virtual void set_tx_continuous_wave(uint32_t freq, int8_t power, uint16_t time){};
+    virtual void set_tx_continuous_wave(uint32_t freq, int8_t power, uint16_t time)
+    {
+    };
 
-    virtual void lock(void){};
+    virtual void lock(void)
+    {
+    };
 
-    virtual void unlock(void){};
+    virtual void unlock(void)
+    {
+    };
 
     bool bool_value;
     uint8_t uint8_value;
@@ -350,6 +396,9 @@ TEST_F(Test_LoRaWANStack, handle_tx)
     cb.events = events_cb;
     cb.link_check_resp = lc_resp;
     cb.battery_level = batt_lvl;
+    struct equeue_event ptr;
+    equeue_stub.void_ptr = &ptr;
+    equeue_stub.call_cb_immediately = true;
     EXPECT_TRUE(LORAWAN_STATUS_OK == object->set_lora_callbacks(&cb));
     EXPECT_TRUE(LORAWAN_STATUS_OK == object->set_link_check_request());
 
@@ -394,6 +443,10 @@ TEST_F(Test_LoRaWANStack, handle_rx)
     LoRaMac_stub::status_value = LORAWAN_STATUS_OK;
     EXPECT_TRUE(LORAWAN_STATUS_NO_ACTIVE_SESSIONS == object->handle_rx(NULL, 0, port, flags, false));
 
+    struct equeue_event ptr;
+    equeue_stub.void_ptr = &ptr;
+    equeue_stub.call_cb_immediately = true;
+
     lorawan_connect_t conn;
     conn.connect_type = LORAWAN_CONNECTION_ABP;
     EXPECT_TRUE(LORAWAN_STATUS_OK == object->connect(conn));
@@ -410,14 +463,13 @@ TEST_F(Test_LoRaWANStack, handle_rx)
     my_LoRaPHY phy;
     object->bind_phy_and_radio_driver(radio, phy);
 
-    struct equeue_event ptr;
-    equeue_stub.void_ptr = &ptr;
-    equeue_stub.call_cb_immediately = true;
     loramac_mcps_confirm_t conf;
+    conf.status = LORAMAC_EVENT_INFO_STATUS_OK;
     LoRaMac_stub::mcps_conf_ptr = &conf;
     radio._ev->tx_done();
 
     loramac_mcps_indication_t ind;
+    ind.status = LORAMAC_EVENT_INFO_STATUS_OK;
     LoRaMac_stub::mcps_ind_ptr = &ind;
 
     loramac_mlme_confirm_t mlme;
@@ -429,14 +481,14 @@ TEST_F(Test_LoRaWANStack, handle_rx)
     conf.req_type = MCPS_PROPRIETARY;
 
     ind.pending = true;
-    LoRaMac_stub::dev_class_value = CLASS_C;
+    LoRaMac_stub::dev_class_value = CLASS_A;
 
     loramac_mlme_indication_t mlme_ind;
     mlme_ind.pending = false;
     LoRaMac_stub::mlme_ind_ptr = &mlme_ind;
 
     uint8_t ind_buf[150];
-    for (int i= 0; i < 110; i++) {
+    for (int i = 0; i < 110; i++) {
         ind_buf[i] = i;
     }
     ind.buffer = ind_buf;
@@ -491,7 +543,7 @@ TEST_F(Test_LoRaWANStack, handle_rx)
     EXPECT_EQ(100, data[0]);
 
     //read can fit the buffer
-    for (int i= 0; i < 110; i++) {
+    for (int i = 0; i < 110; i++) {
         ind_buf[i] = i;
     }
     ind.buffer = ind_buf;
@@ -546,16 +598,12 @@ TEST_F(Test_LoRaWANStack, set_device_class)
     EXPECT_TRUE(LORAWAN_STATUS_UNSUPPORTED == object->set_device_class(CLASS_B));
 
     EXPECT_TRUE(LORAWAN_STATUS_OK == object->set_device_class(CLASS_A));
-
-    //Visit callback
-    if (LoRaMac_stub::_ack_expiry_handler_for_class_c) {
-        LoRaMac_stub::_ack_expiry_handler_for_class_c.call();
-    }
 }
 
 TEST_F(Test_LoRaWANStack, acquire_tx_metadata)
 {
     lorawan_tx_metadata data;
+    memset(&data, 0, sizeof(data));
     EXPECT_TRUE(LORAWAN_STATUS_NOT_INITIALIZED == object->acquire_tx_metadata(data));
 
     EventQueue queue;
@@ -574,8 +622,13 @@ TEST_F(Test_LoRaWANStack, acquire_tx_metadata)
     equeue_stub.void_ptr = &ptr;
     equeue_stub.call_cb_immediately = true;
     loramac_mcps_confirm_t conf;
+    memset(&conf, 0, sizeof(conf));
+    conf.status = LORAMAC_EVENT_INFO_STATUS_OK;
     LoRaMac_stub::mcps_conf_ptr = &conf;
     radio._ev->tx_done();
+
+    LoRaMac_stub::slot_value = RX_SLOT_WIN_2;
+    radio._ev->rx_timeout();
 
     EXPECT_TRUE(LORAWAN_STATUS_OK == object->acquire_tx_metadata(data));
 }
@@ -583,6 +636,7 @@ TEST_F(Test_LoRaWANStack, acquire_tx_metadata)
 TEST_F(Test_LoRaWANStack, acquire_rx_metadata)
 {
     lorawan_rx_metadata data;
+    memset(&data, 0, sizeof(data));
     EXPECT_TRUE(LORAWAN_STATUS_NOT_INITIALIZED == object->acquire_rx_metadata(data));
 
     EventQueue queue;
@@ -601,13 +655,18 @@ TEST_F(Test_LoRaWANStack, acquire_rx_metadata)
     equeue_stub.void_ptr = &ptr;
     equeue_stub.call_cb_immediately = true;
     loramac_mcps_confirm_t conf;
+    memset(&conf, 0, sizeof(conf));
+    conf.status = LORAMAC_EVENT_INFO_STATUS_OK;
     LoRaMac_stub::mcps_conf_ptr = &conf;
     radio._ev->tx_done();
 
     loramac_mcps_indication_t ind;
+    memset(&ind, 0, sizeof(ind));
+    ind.status = LORAMAC_EVENT_INFO_STATUS_OK;
     LoRaMac_stub::mcps_ind_ptr = &ind;
 
     loramac_mlme_confirm_t mlme;
+    mlme.status = LORAMAC_EVENT_INFO_STATUS_OK;
     LoRaMac_stub::mlme_conf_ptr = &mlme;
     mlme.pending = true;
     mlme.req_type = MLME_JOIN;
@@ -631,6 +690,7 @@ TEST_F(Test_LoRaWANStack, acquire_rx_metadata)
     EXPECT_TRUE(LORAWAN_STATUS_OK == object->set_lora_callbacks(&cb));
     mlme.req_type = MLME_LINK_CHECK;
     mlme.status = LORAMAC_EVENT_INFO_STATUS_OK;
+    LoRaMac_stub::bool_true_counter = true;
     radio._ev->rx_done(NULL, 0, 0, 0);
 
     EXPECT_TRUE(LORAWAN_STATUS_OK == object->acquire_rx_metadata(data));
@@ -658,7 +718,7 @@ TEST_F(Test_LoRaWANStack, stop_sending)
     EventQueue queue;
     EXPECT_TRUE(LORAWAN_STATUS_OK == object->initialize_mac_layer(&queue));
 
-    LoRaMac_stub::status_value = LORAWAN_STATUS_DEVICE_OFF;
+    LoRaMac_stub::status_value = LORAWAN_STATUS_BUSY;
     EXPECT_TRUE(LORAWAN_STATUS_BUSY == object->stop_sending());
 
     LoRaMac_stub::status_value = LORAWAN_STATUS_OK;
@@ -809,10 +869,12 @@ TEST_F(Test_LoRaWANStack, process_reception)
     equeue_stub.void_ptr = &ptr;
     equeue_stub.call_cb_immediately = true;
     loramac_mcps_confirm_t conf;
+    memset(&conf, 0, sizeof(&conf));
     LoRaMac_stub::mcps_conf_ptr = &conf;
     radio._ev->tx_done();
 
     loramac_mcps_indication_t ind;
+    memset(&ind, 0, sizeof(ind));
     LoRaMac_stub::mcps_ind_ptr = &ind;
 
     loramac_mlme_confirm_t mlme;
@@ -831,7 +893,7 @@ TEST_F(Test_LoRaWANStack, process_reception)
     LoRaMac_stub::mlme_ind_ptr = &mlme_ind;
 
     uint8_t ind_buf[150];
-    for (int i= 0; i < 110; i++) {
+    for (int i = 0; i < 110; i++) {
         ind_buf[i] = i;
     }
     ind.buffer = ind_buf;
@@ -851,7 +913,7 @@ TEST_F(Test_LoRaWANStack, process_reception)
 
     conf.req_type = MCPS_UNCONFIRMED;
     LoRaMac_stub::dev_class_value = CLASS_A;
-    LoRaMac_stub::bool_value = true;
+    LoRaMac_stub::bool_true_counter++;
     mlme_ind.pending = true;
     mlme_ind.indication_type = MLME_SCHEDULE_UPLINK;
     conf.status = LORAMAC_EVENT_INFO_STATUS_ERROR;
