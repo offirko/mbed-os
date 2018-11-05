@@ -24,6 +24,7 @@ extern "C"
 #define UNITY_FLOAT_VERBOSE
 
 #include "unity_internals.h"
+#include "mbed_error.h"
 
 void setUp(void);
 void tearDown(void);
@@ -293,6 +294,15 @@ void tearDown(void);
 #define TEST_ASSERT_DOUBLE_IS_NOT_NEG_INF_MESSAGE(actual, message)                                 UNITY_TEST_ASSERT_DOUBLE_IS_NOT_NEG_INF((actual), __LINE__, (message))
 #define TEST_ASSERT_DOUBLE_IS_NOT_NAN_MESSAGE(actual, message)                                     UNITY_TEST_ASSERT_DOUBLE_IS_NOT_NAN((actual), __LINE__, (message))
 #define TEST_ASSERT_DOUBLE_IS_NOT_DETERMINATE_MESSAGE(actual, message)                             UNITY_TEST_ASSERT_DOUBLE_IS_NOT_DETERMINATE((actual), __LINE__, (message))
+
+
+/*-------------------------------------------------------
+ * Error code checking
+ *-------------------------------------------------------*/
+// Use these to check whether error code equals what we expect.
+// Only display error code (without other information)
+#define TEST_ASSERT_EQUAL_ERROR_CODE(expected, actual)                                             TEST_ASSERT_EQUAL(expected & MBED_ERROR_STATUS_CODE_MASK, actual & MBED_ERROR_STATUS_CODE_MASK)
+#define TEST_ASSERT_EQUAL_ERROR_CODE_MESSAGE(expected, actual, message)                            TEST_ASSERT_EQUAL_MESSAGE(expected & MBED_ERROR_STATUS_CODE_MASK, actual & MBED_ERROR_STATUS_CODE_MASK)
 
 /*-------------------------------------------------------
  * Test skipping
