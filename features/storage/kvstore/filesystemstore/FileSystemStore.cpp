@@ -98,8 +98,8 @@ int FileSystemStore::deinit()
 {
     _mutex.lock();
     _is_initialized = false;
-    delete _cfg_fs_path;
-    delete _full_path_key;
+    delete[] _cfg_fs_path;
+    delete[] _full_path_key;
     _mutex.unlock();
     return MBED_SUCCESS;
 
@@ -432,7 +432,7 @@ int FileSystemStore::set_finalize(set_handle_t handle)
                        set_handle->data_size, _full_path_key);
         }
 
-        delete set_handle->key;
+        delete[] set_handle->key;
     }
 
     delete set_handle;
@@ -474,7 +474,7 @@ int FileSystemStore::iterator_open(iterator_t *it, const char *prefix)
         tr_error("KV Dir: %s, doesnt exist", _cfg_fs_path); //TBD verify ERRNO NOEXIST
         delete kv_dir;
         if (key_it->prefix != NULL) {
-            delete key_it->prefix;
+            delete[] key_it->prefix;
         }
         delete key_it;
         status = MBED_ERROR_ITEM_NOT_FOUND;
@@ -553,7 +553,7 @@ int FileSystemStore::iterator_close(iterator_t it)
     }
 
     if (key_it->prefix != NULL) {
-        delete key_it->prefix;
+        delete[] key_it->prefix;
     }
 
     ((Dir *)(key_it->dir_handle))->close();
