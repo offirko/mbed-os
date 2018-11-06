@@ -201,7 +201,7 @@ int FileSystemStore::get(const char *key, void *buffer, size_t buffer_size, size
     // Actual size is the minimum of buffer_size and remainder of data in file (file's data size - offset)
     value_actual_size = buffer_size;
     if (offset > kv_file_size) {
-        status = MBED_ERROR_INVALID_DATA_DETECTED;
+        status = MBED_ERROR_INVALID_SIZE;
         goto exit_point;
     } else if ((kv_file_size - offset) < buffer_size) {
         value_actual_size = kv_file_size - offset;
@@ -377,7 +377,7 @@ int FileSystemStore::set_add_data(set_handle_t handle, const void *value_data, s
     inc_set_handle_t *set_handle = (inc_set_handle_t *)handle;
     File kv_file;
 
-    if ((value_data == NULL) || (handle == NULL) || (handle != _cur_inc_set_handle)) {
+    if ( ((value_data == NULL) && (data_size > 0)) || (handle == NULL) || (handle != _cur_inc_set_handle)) {
         status = MBED_ERROR_INVALID_ARGUMENT;
         goto exit_point;
     }
@@ -387,7 +387,7 @@ int FileSystemStore::set_add_data(set_handle_t handle, const void *value_data, s
     if ( (_cur_inc_data_size + data_size) > set_handle->data_size ) {
         tr_warning("Added Data(%d) will exceed set_start final size(%d) - not adding data to file: %s",
                    _cur_inc_data_size + data_size, set_handle->data_size, _full_path_key);
-        status = MBED_ERROR_INVALID_DATA_DETECTED;
+        status = MBED_ERROR_INVALID_SIZE;
         goto exit_point;
     }
 
