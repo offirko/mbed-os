@@ -147,8 +147,8 @@ int FileSystemStore::set(const char *key, const void *buffer, size_t size, uint3
         goto exit_point;
     }
 
-    if ((!is_valid_key(key)) || (size > KVStore::MAX_KEY_SIZE) || ((buffer == NULL) && (size > 0)) ) {
-        status = MBED_ERROR_INVALID_SIZE;
+    if ((!is_valid_key(key)) || ((buffer == NULL) && (size > 0)) ) {
+        status = MBED_ERROR_INVALID_ARGUMENT;
         goto exit_point;
     }
 
@@ -193,7 +193,7 @@ int FileSystemStore::get(const char *key, void *buffer, size_t buffer_size, size
     key_metadata_t key_metadata;
 
     if ( (status = _verify_key_file(key, &key_metadata, &kv_file)) != MBED_SUCCESS ) {
-        tr_error("File Verification Failed: %s, status: %d", key, status);
+        tr_error("File Verification failed, status: %d", status);
         goto exit_point;
     }
 
@@ -245,7 +245,7 @@ int FileSystemStore::get_info(const char *key, info_t *info)
     key_metadata_t key_metadata;
 
     if ( (status = _verify_key_file(key, &key_metadata, &kv_file)) != MBED_SUCCESS ) {
-        tr_error("File Verification Failed: %s, status: %d", key, status);
+        tr_error("File Verification failed, status: %d", status);
         goto exit_point;
     }
 
@@ -269,10 +269,6 @@ int FileSystemStore::remove(const char *key)
     File kv_file;
     key_metadata_t key_metadata;
 
-    if (key == NULL) {
-        return MBED_ERROR_INVALID_ARGUMENT;
-    }
-
     _mutex.lock();
 
     int status = MBED_SUCCESS;
@@ -291,7 +287,8 @@ int FileSystemStore::remove(const char *key)
             status = MBED_ERROR_WRITE_PROTECTED;
             goto exit_point;
         }
-    } else if (status == MBED_ERROR_ITEM_NOT_FOUND)  {
+    } else if ((status == MBED_ERROR_ITEM_NOT_FOUND) ||
+               (status == MBED_ERROR_INVALID_ARGUMENT)) {
         goto exit_point;
     }
     kv_file.close();
@@ -317,15 +314,22 @@ int FileSystemStore::set_start(set_handle_t *handle, const char *key, size_t fin
     // Only a single key file can be incrementaly editted at a time
     _mutex.lock();
 
-    if ((!is_valid_key(key)) || (handle == NULL) ) {
+    if (handle == NULL) {
         status = MBED_ERROR_INVALID_ARGUMENT;
         goto exit_point;
     }
 
     /* If File Exists and is Valid, then check its Write Once Flag to verify its disabled before setting */
     /* If File exists and is not valid, or is Valid and not Write-Onced then erase it */
-    if ( (status = _verify_key_file(key, &key_metadata, &kv_file)) == MBED_SUCCESS ) {
-        tr_error("File: %s, Exists Verifying Write Once Disabled before setting new value", _full_path_key);
+    status = _verify_key_file(key, &key_metadata, &kv_file);
+
+    if (status == MBED_ERROR_INVALID_ARGUMENT) {
+        tr_error("File Verification failed, status: %d", status);
+        goto exit_point;
+    }
+
+    if (status == MBED_SUCCESS ) {
+        tr_info("File: %s, Exists. Verifying Write Once Disabled before setting new value", _full_path_key);
         if (key_metadata.user_flags & KVStore::WRITE_ONCE_FLAG) {
             kv_file.close();
             status = MBED_ERROR_WRITE_PROTECTED;
@@ -333,7 +337,8 @@ int FileSystemStore::set_start(set_handle_t *handle, const char *key, size_t fin
         }
     }
 
-    if (status != MBED_ERROR_ITEM_NOT_FOUND)  {
+    /* For Success (not write_once) and for corrupted data close file before recreating it as a new file */
+    if (status != MBED_ERROR_ITEM_NOT_FOUND) {
         kv_file.close();
     }
 

@@ -89,7 +89,7 @@ public:
       *
       * @returns 0 on success or a negative error code on failure
       */
-    virtual int get(const char *key, void *buffer, size_t buffer_size, size_t *actual_size, size_t offset = 0);
+    virtual int get(const char *key, void *buffer, size_t buffer_size, size_t *actual_size = NULL, size_t offset = 0);
 
     /**
      * @brief Get information of a given key.
