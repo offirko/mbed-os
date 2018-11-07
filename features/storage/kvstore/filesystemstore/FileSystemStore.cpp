@@ -161,6 +161,7 @@ int FileSystemStore::set(const char *key, const void *buffer, size_t size, uint3
     status = set_add_data(handle, buffer, size);
     if (status != MBED_SUCCESS) {
         tr_error("FSST Set set_add_data Failed: %d", status);
+        set_finalize(handle);
         goto exit_point;
     }
 
