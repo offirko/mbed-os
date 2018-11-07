@@ -429,8 +429,10 @@ int FileSystemStore::set_finalize(set_handle_t handle)
         status = MBED_ERROR_INVALID_DATA_DETECTED;
     } else {
         if (_cur_inc_data_size != set_handle->data_size ) {
-            tr_warning("Accumulated Data size doesn't match set_start final size - file: %s", _cur_inc_data_size,
-                       set_handle->data_size, _full_path_key);
+            tr_error("Accumulated Data (%d) size doesn't match set_start final size (%d) - file: %s", _cur_inc_data_size,
+                     set_handle->data_size, _full_path_key);
+            status = MBED_ERROR_INVALID_SIZE;
+            _fs->remove(_full_path_key);
         }
 
         delete[] set_handle->key;

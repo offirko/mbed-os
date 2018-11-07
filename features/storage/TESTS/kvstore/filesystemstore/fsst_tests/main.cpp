@@ -387,7 +387,7 @@ void test_file_system_store_edge_cases()
     err = fsst->set_add_data(handle, "abcde12345", 5);
     err = fsst->set_add_data(handle, "abcde12345", 3);
     err = fsst->set_finalize(handle);
-    TEST_ASSERT_EQUAL(0, err);
+    TEST_ASSERT_EQUAL_ERROR_CODE(MBED_ERROR_INVALID_SIZE, err);
 
     err = fsst->deinit();
     TEST_ASSERT_EQUAL(0, err);
