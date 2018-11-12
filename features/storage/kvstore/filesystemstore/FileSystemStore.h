@@ -72,7 +72,7 @@ public:
      * @param[in]  key                  Key.
      * @param[in]  buffer               Value data buffer.
      * @param[in]  size                 Value data size.
-     * @param[in]  create_flags         Flag mask.
+     * @param[in]  create_flags         Flag mask (supports only optional flag KVStore::WRITE_ONCE_FLAG).
      *
      * @returns 0 on success or a negative error code on failure
      */
@@ -116,7 +116,7 @@ public:
      * @param[out] handle               Returned incremental set handle.
      * @param[in]  key                  Key.
      * @param[in]  final_data_size      Final value data size.
-     * @param[in]  create_flags         Flag mask.
+     * @param[in]  create_flags         Flag mask (supports only optional flag KVStore::WRITE_ONCE_FLAG).
      *
      * @returns 0 on success or a negative error code on failure
      */

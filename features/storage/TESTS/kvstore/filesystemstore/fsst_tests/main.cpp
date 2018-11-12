@@ -52,7 +52,7 @@ static void test_set_thread_job(void *data)
 
     strcat(kv_value, itoa(thread_num, thread_str, 10));
     strcat(kv_key, itoa(thread_num, thread_str, 10));
-    err = thread_fsst->set(kv_key, kv_value, strlen(kv_value) + 1, 0x2);
+    err = thread_fsst->set(kv_key, kv_value, strlen(kv_value) + 1, 0);
 
     TEST_ASSERT_EQUAL(0, err);
 }
@@ -94,12 +94,16 @@ void test_file_system_store_functionality_unit_test()
     err = fsst->reset();
     TEST_ASSERT_EQUAL(0, err);
 
+    /* Set key1 with invalid flag */
+    err = fsst->set(kv_key1, kv_value1, 64, KVStore::ENCRYPT_FLAG);
+    TEST_ASSERT_EQUAL_ERROR_CODE(MBED_ERROR_INVALID_ARGUMENT, err);
+
     /* Set key1 */
-    err = fsst->set(kv_key1, kv_value1, 64, 0x2);
+    err = fsst->set(kv_key1, kv_value1, 64, 0);
     TEST_ASSERT_EQUAL(0, err);
 
     /* Set key2 */
-    err = fsst->set(kv_key2, kv_value2, strlen(kv_value2), 0x4);
+    err = fsst->set(kv_key2, kv_value2, strlen(kv_value2), 0);
     TEST_ASSERT_EQUAL(0, err);
 
     err = fsst->get(kv_key2, kv_buf, 64, &actual_size, 0);
@@ -109,18 +113,18 @@ void test_file_system_store_functionality_unit_test()
 
     KVStore::info_t kv_info;
     err = fsst->get_info(kv_key1, &kv_info);
-    TEST_ASSERT_EQUAL(((int)kv_info.flags), 0x2);
+    TEST_ASSERT_EQUAL(((int)kv_info.flags), 0);
     TEST_ASSERT_EQUAL(0, err);
 
     /* Set kei3 */
-    err = fsst->set(kv_key3, kv_value3, 12, 0x8);
+    err = fsst->set(kv_key3, kv_value3, 12, 0);
     TEST_ASSERT_EQUAL(0, err);
 
     /* Set key5 WRITE_ONCE Twice */
-    err = fsst->set(kv_key5, kv_value5, 10, 0x1);
+    err = fsst->set(kv_key5, kv_value5, 10, KVStore::WRITE_ONCE_FLAG);
     TEST_ASSERT_EQUAL(0, err);
 
-    err = fsst->set(kv_key5, kv_value3, 10, 0x8);
+    err = fsst->set(kv_key5, kv_value3, 10, 0);
     TEST_ASSERT_EQUAL_ERROR_CODE(MBED_ERROR_WRITE_PROTECTED, err);
 
     /* Verify value remains of first set */
@@ -189,7 +193,7 @@ void test_file_system_store_functionality_unit_test()
     TEST_ASSERT_EQUAL_ERROR_CODE(MBED_ERROR_ITEM_NOT_FOUND, err);
 
     /* Verify that key5 Write-Once can be set again after Reset*/
-    err = fsst->set(kv_key5, kv_value5, 10, 0x1);
+    err = fsst->set(kv_key5, kv_value5, 10, KVStore::WRITE_ONCE_FLAG);
     TEST_ASSERT_EQUAL(0, err);
 
     err = fsst->deinit();
@@ -237,24 +241,24 @@ void test_file_system_store_edge_cases()
     /*********** Unit Test ***********/
     /*********************************/
     /* Fail Set - key NULL */
-    err = fsst->set(NULL, kv_value1, 64, 0x2);
+    err = fsst->set(NULL, kv_value1, 64, 0);
     TEST_ASSERT_NOT_EQUAL(0, err);
 
     /* Fail Set - Key length exceeds max */
-    err = fsst->set(NULL, kv_value1, KVStore::MAX_KEY_SIZE + 10, 0x2);
+    err = fsst->set(NULL, kv_value1, KVStore::MAX_KEY_SIZE + 10, 0);
     TEST_ASSERT_NOT_EQUAL(0, err);
 
     /* Fail Set - NULL Buffer and size larger than 0 */
-    err = fsst->set(kv_key1, NULL, 64, 0x2);
+    err = fsst->set(kv_key1, NULL, 64, 0);
     TEST_ASSERT_NOT_EQUAL(0, err);
 
     /* OK Set - NULL Buffer and Size is 0 */
-    err = fsst->set(kv_key1, kv_value1, 0, 0x2);
+    err = fsst->set(kv_key1, kv_value1, 0, 0);
     TEST_ASSERT_EQUAL(0, err);
 
     /* OK Set - Set Key1 twice and get returns second value */
-    err = fsst->set(kv_key1, kv_value1, 64, 0x2);
-    err = fsst->set(kv_key1, kv_value2, strlen(kv_value2), 0x2);
+    err = fsst->set(kv_key1, kv_value1, 64, 0);
+    err = fsst->set(kv_key1, kv_value2, strlen(kv_value2), 0);
     memset(kv_buf, 0, 64);
     err = fsst->get(kv_key1, kv_buf, 64, &actual_size, 0);
     TEST_ASSERT_EQUAL(0, strcmp(kv_buf, kv_value2));
@@ -323,7 +327,7 @@ void test_file_system_store_edge_cases()
     err = fsst->iterator_close(kv_it);
 
     /* OK Iteraor Next - 1 File in folder, first returns ok, second returns not found  */
-    err = fsst->set(kv_key1, kv_value1, 64, 0x2);
+    err = fsst->set(kv_key1, kv_value1, 64, 0);
     err = fsst->iterator_open(&kv_it, NULL);
     err = fsst->iterator_next(kv_it, kv_name, 16);
     TEST_ASSERT_EQUAL(0, err);
@@ -337,16 +341,16 @@ void test_file_system_store_edge_cases()
     TEST_ASSERT_EQUAL(0, err);
 
     /* Fail Set_Start - NULL handle */
-    err = fsst->set_start(NULL, "key1", 64, 0x2);
+    err = fsst->set_start(NULL, "key1", 64, 0);
     TEST_ASSERT_NOT_EQUAL(0, err);
 
     /* Fail Set_Start - NULL key */
     KVStore::set_handle_t handle;
-    err = fsst->set_start(&handle, NULL, 64, 0x2);
+    err = fsst->set_start(&handle, NULL, 64, 0);
     TEST_ASSERT_NOT_EQUAL(0, err);
 
     /* OK Set_Finalize - finalize after start, size 0 */
-    err = fsst->set_start(&handle, "key1", 0, 0x2);
+    err = fsst->set_start(&handle, "key1", 0, 0);
     err = fsst->set_finalize(handle);
     TEST_ASSERT_EQUAL(0, err);
 
@@ -355,13 +359,13 @@ void test_file_system_store_edge_cases()
     TEST_ASSERT_NOT_EQUAL(0, err);
 
     /* Fail Set_Add_Data - NULL value */
-    err = fsst->set_start(&handle, "key1", 0, 0x2);
+    err = fsst->set_start(&handle, "key1", 0, 0);
     err = fsst->set_add_data(handle, NULL, 10);
     TEST_ASSERT_NOT_EQUAL(0, err);
     err = fsst->set_finalize(handle);
 
     /* OK Set_Add_Data - value size 0 */
-    err = fsst->set_start(&handle, "key1", 10, 0x2);
+    err = fsst->set_start(&handle, "key1", 10, 0);
     err = fsst->set_add_data(handle, "abcde12345", 10);
     memset(kv_buf, 0, 64);
     err = fsst->get(kv_key1, kv_buf, 10, &actual_size, 0);
@@ -374,7 +378,7 @@ void test_file_system_store_edge_cases()
     TEST_ASSERT_EQUAL(0, strcmp(kv_buf, "abcde12345"));
 
     /* FAIL SET_Add_Data - exceed final size  */
-    err = fsst->set_start(&handle, "key1", 10, 0x2);
+    err = fsst->set_start(&handle, "key1", 10, 0);
     err = fsst->set_add_data(handle, "abcde12345", 5);
     err = fsst->set_add_data(handle, "abcde12345", 10);
     TEST_ASSERT_NOT_EQUAL(0, err);
@@ -383,7 +387,7 @@ void test_file_system_store_edge_cases()
     err = fsst->set_finalize(handle);
 
     /* FAIL SET_Add_Data - final size smaller than set at start */
-    err = fsst->set_start(&handle, "key1", 10, 0x2);
+    err = fsst->set_start(&handle, "key1", 10, 0);
     err = fsst->set_add_data(handle, "abcde12345", 5);
     err = fsst->set_add_data(handle, "abcde12345", 3);
     err = fsst->set_finalize(handle);
@@ -421,7 +425,7 @@ void test_file_system_store_multi_threads()
     err = fsst->reset();
     TEST_ASSERT_EQUAL(0, err);
 
-    thread_data_t thread_data[3];
+    thread_data_t thread_data[FSST_TEST_NUM_OF_THREADS];
 
     /* Thread Access Test Starts */
     rtos::Thread set_thread[FSST_TEST_NUM_OF_THREADS];

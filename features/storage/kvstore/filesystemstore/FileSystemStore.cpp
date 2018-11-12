@@ -73,7 +73,7 @@ int FileSystemStore::init()
 
     if (kv_dir.open(_fs, _cfg_fs_path) != 0) {
         tr_info("KV Dir: %s, doesnt exist - creating new.. ", _cfg_fs_path); //TBD verify ERRNO NOEXIST
-        if (_fs->mkdir(_cfg_fs_path,/* which flags ? */0777) != 0) {
+        if (_fs->mkdir(_cfg_fs_path, 0777) != 0) {
             tr_error("KV Dir: %s, mkdir failed.. ", _cfg_fs_path); //TBD verify ERRNO NOEXIST
             status = MBED_ERROR_FAILED_OPERATION ;
             goto exit_point;
@@ -315,7 +315,8 @@ int FileSystemStore::set_start(set_handle_t *handle, const char *key, size_t fin
     // Only a single key file can be incrementaly editted at a time
     _mutex.lock();
 
-    if (handle == NULL) {
+    /* Only optional flag supported is Write-Once-Flag */
+    if ((handle == NULL) || (create_flags & (~KVStore::WRITE_ONCE_FLAG)) ) {
         status = MBED_ERROR_INVALID_ARGUMENT;
         goto exit_point;
     }
