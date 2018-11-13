@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#include "greentea-client/test_env.h"
-#include "unity.h"
-#include "utest.h"
+#include "rtos/Thread.h"
+#include "mbed_trace.h"
+#include "mbed_error.h"
 #include "BlockDevice.h"
 #include "FileSystem.h"
 #include "FileSystemStore.h"
-#include "mbed_trace.h"
-#include "mbed_error.h"
-#include "rtos/Thread.h"
+#include "greentea-client/test_env.h"
+#include "unity.h"
+#include "utest.h"
 #include <stdlib.h>
 
 #define FSST_TEST_NUM_OF_THREADS 5
@@ -49,9 +49,9 @@ static void test_set_thread_job(void *data)
     FileSystemStore *thread_fsst = (FileSystemStore *)(thread_data->fsst);
 
     utest_printf("\n Thread %d Started\n", thread_num);
-
-    strcat(kv_value, itoa(thread_num, thread_str, 10));
-    strcat(kv_key, itoa(thread_num, thread_str, 10));
+    sprintf(thread_str, "%d", thread_num);
+    strcat(kv_value, thread_str);
+    strcat(kv_key, thread_str);
     err = thread_fsst->set(kv_key, kv_value, strlen(kv_value) + 1, 0);
 
     TEST_ASSERT_EQUAL(0, err);
@@ -452,8 +452,9 @@ void test_file_system_store_multi_threads()
 
     for (i_ind = 1; i_ind < (FSST_TEST_NUM_OF_THREADS + 1); i_ind++) {
         memset(kv_buf, 0, 64);
-        strcpy(&kv_value[10], itoa(i_ind, thread_str, 10));
-        strcpy(&kv_key[3], itoa(i_ind, thread_str, 10));
+        sprintf(thread_str, "%d", i_ind);
+        strcpy(&kv_value[10], thread_str);
+        strcpy(&kv_key[3], thread_str);
         err = fsst->get(kv_key, kv_buf, 12, &actual_size, 0);
         TEST_ASSERT_EQUAL_ERROR_CODE(0, err);
         TEST_ASSERT_EQUAL(0, strcmp(kv_value, kv_buf));
