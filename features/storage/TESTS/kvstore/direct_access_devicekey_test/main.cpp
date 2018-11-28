@@ -21,6 +21,7 @@
 #include "TDBStore.h"
 #include "HeapBlockDevice.h"
 #include "FlashSimBlockDevice.h"
+#include "SlicingBlockDevice.h"
 #include "DirectAccessDevicekey.h"
 #include "greentea-client/test_env.h"
 #include "unity.h"
@@ -32,9 +33,9 @@ using namespace mbed;
 
 #define TEST_DEVICEKEY_LENGTH 32
 
-void test_direct_access_to_devicekey()
+void test_direct_access_to_devicekey_zero_offset()
 {
-    utest_printf("Test Direct Access To DeviceKey Test\n");
+    utest_printf("Test Direct Access To DeviceKey Test with zero offset\n");
 
     /* TDBStore can not work on SD Card BD */
 #if COMPONENT_SD
@@ -80,6 +81,60 @@ void test_direct_access_to_devicekey()
     TEST_ASSERT_EQUAL(0, err);
 }
 
+void test_direct_access_to_devicekey_with_offset()
+{
+    utest_printf("Test Direct Access To DeviceKey Test with given offset\n");
+
+    /* TDBStore can not work on SD Card BD */
+#if COMPONENT_SD
+    const size_t ul_bd_size  = 8 * 4096;
+    const size_t rbp_bd_size = 4 * 4096;
+    HeapBlockDevice heap_bd(ul_bd_size + rbp_bd_size, 1, 1, 4096);
+    FlashSimBlockDevice *flash_bd = new FlashSimBlockDevice(&heap_bd);
+#else
+    BlockDevice *bd = BlockDevice::get_default_instance();
+    BlockDevice *flash_bd = bd;
+#endif
+
+    bd_addr_t start_offset = 4096;
+    bd_addr_t end_offset = 5 * 4096;
+
+    SlicingBlockDevice *slbd = new SlicingBlockDevice(flash_bd, start_offset, end_offset);
+
+    int err = flash_bd->init();
+    TEST_ASSERT_EQUAL(0, err);
+
+    TDBStore *tdb = new TDBStore(slbd);
+    /* Start by Init and Reset to TDBStore */
+    err = tdb->init();
+    TEST_ASSERT_EQUAL_ERROR_CODE(0, err);
+    err = tdb->reset();
+    TEST_ASSERT_EQUAL_ERROR_CODE(0, err);
+
+    // Assign a dummy DeviceKey, and set via tdb
+    uint8_t device_key_in[TEST_DEVICEKEY_LENGTH] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32};
+    err = tdb->reserved_data_set(device_key_in, TEST_DEVICEKEY_LENGTH);
+    TEST_ASSERT_EQUAL_ERROR_CODE(0, err);
+
+    // Now use Direct Access To DeviceKey to retrieve it */
+    uint8_t device_key_out[TEST_DEVICEKEY_LENGTH] = {0};
+    size_t actual_data_size = 0;
+    err = direct_access_to_devicekey(flash_bd, start_offset, end_offset, device_key_out, TEST_DEVICEKEY_LENGTH,
+                                     &actual_data_size);
+    TEST_ASSERT_EQUAL_ERROR_CODE(0, err);
+
+    /* Assert DeviceKey value and length */
+    TEST_ASSERT_EQUAL(actual_data_size, TEST_DEVICEKEY_LENGTH);
+    for (int i_ind = 0; i_ind < TEST_DEVICEKEY_LENGTH; i_ind++) {
+        TEST_ASSERT_EQUAL(device_key_out[i_ind], device_key_in[i_ind]);
+    }
+
+    delete tdb;
+
+    err = flash_bd->deinit();
+    TEST_ASSERT_EQUAL(0, err);
+}
+
 // Test setup
 utest::v1::status_t greentea_failure_handler(const Case *const source, const failure_t reason)
 {
@@ -88,7 +143,8 @@ utest::v1::status_t greentea_failure_handler(const Case *const source, const fai
 }
 
 Case cases[] = {
-    Case("Testing direct access to devicekey ", test_direct_access_to_devicekey, greentea_failure_handler),
+    Case("Testing direct access to devicekey with zero offset", test_direct_access_to_devicekey_zero_offset, greentea_failure_handler),
+    Case("Testing direct access to devicekey with given offset ", test_direct_access_to_devicekey_with_offset, greentea_failure_handler),
 };
 
 utest::v1::status_t greentea_test_setup(const size_t number_of_cases)
