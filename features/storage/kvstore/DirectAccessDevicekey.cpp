@@ -16,8 +16,7 @@
 
 // ----------------------------------------------------------- Includes -----------------------------------------------------------
 
-#include "BootLoaderTool.h"
-//#include <algorithm>
+#include "DirectAccessDevicekey.h"
 #include <string.h>
 #include <stdio.h>
 #include "mbed_error.h"
@@ -29,8 +28,8 @@ using namespace mbed;
 
 // --------------------------------------------------------- Definitions ----------------------------------------------------------
 #define TDBSTORE_NUMBER_OF_AREAS 2
-#define MAX_DEVICE_KEY_DATA_SIZE 64
-#define RESERVED_AREA_SIZE (MAX_DEVICE_KEY_DATA_SIZE+8) /* DeviceKey Max Data size + 4bytes address + 4bytes deviceKey actual size */
+#define MAX_DEVICEKEY_DATA_SIZE 64
+#define RESERVED_AREA_SIZE (MAX_DEVICEKEY_DATA_SIZE+8) /* DeviceKey Max Data size + 4bytes address + 4bytes deviceKey actual size */
 
 typedef struct {
     uint32_t address;
@@ -49,7 +48,7 @@ static int reserved_data_get(BlockDevice *bd, tdbstore_area_data_t *area_params,
 static uint32_t calc_crc(uint32_t init_crc, uint32_t data_size, const void *data_buf);
 
 // -------------------------------------------------- API Functions Implementation ----------------------------------------------------
-int bootloader_get_device_key(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t tdb_end_offset, void *data_buf, size_t data_buf_size, size_t *actual_data_size_ptr)
+int direct_access_to_devicekey(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t tdb_end_offset, void *data_buf, size_t data_buf_size, size_t *actual_data_size_ptr)
 {
 	int status = MBED_ERROR_INVALID_ARGUMENT;
 	uint8_t active_area = 0;
@@ -62,7 +61,7 @@ int bootloader_get_device_key(BlockDevice *bd, uint32_t tdb_start_offset, uint32
 	}
 
 	status = calc_area_params(bd, tdb_start_offset, tdb_end_offset, area_params);
-	if (status == MBED_SUCCESS) {
+	if (status != MBED_SUCCESS) {
 		tr_error("Couldn't calulate Area Params - err: %d", status);
 		goto exit_point;
 	}
@@ -129,7 +128,7 @@ static int reserved_data_get(BlockDevice *bd, tdbstore_area_data_t *area_params,
     uint8_t blank = bd->get_erase_value();
 
     /* Read Into trailer deviceKey metadata */
-    ret = bd->read(&trailer, area_params->address + MAX_DEVICE_KEY_DATA_SIZE, sizeof(trailer));
+    ret = bd->read(&trailer, area_params->address + MAX_DEVICEKEY_DATA_SIZE, sizeof(trailer));
     if (ret != MBED_SUCCESS) {
     	status =  MBED_ERROR_READ_FAILED;
         goto exit_point;

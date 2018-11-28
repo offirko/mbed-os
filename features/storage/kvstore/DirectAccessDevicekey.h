@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-#ifndef MBED_BOOT_LOADER_TOOL_H
-#define MBED_BOOT_LOADER_TOOL_H
+#ifndef MBED_DIRECT_ACCESS_DEVICEKEY_H
+#define MBED_DIRECT_ACCESS_DEVICEKEY_H
 
 #include "BlockDevice.h"
-//#include <stdint.h>
 #include <stdio.h>
 
-int bootloader_get_device_key(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t tdb_end_offset, void *data_buf, size_t data_buf_size, size_t *actual_data_size_ptr);
+int direct_access_to_devicekey(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t tdb_end_offset, void *data_buf, size_t data_buf_size, size_t *actual_data_size_ptr);
 
-#endif /* MBED_BOOT_LOADER_TOOL_H */
+#endif /* MBED_DIRECT_ACCESS_DEVICEKEY_H */
