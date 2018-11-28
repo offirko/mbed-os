@@ -57,20 +57,21 @@ void test_direct_access_to_devicekey()
     TEST_ASSERT_EQUAL_ERROR_CODE(0, err);
 
     // Assign a dummy DeviceKey, and set via tdb
-    uint8_t device_key_in[TEST_DEVICEKEY_LENGTH] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32};
+    uint8_t device_key_in[TEST_DEVICEKEY_LENGTH] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32};
     err = tdb->reserved_data_set(device_key_in, TEST_DEVICEKEY_LENGTH);
     TEST_ASSERT_EQUAL_ERROR_CODE(0, err);
 
     // Now use Direct Access To DeviceKey to retrieve it */
     uint8_t device_key_out[TEST_DEVICEKEY_LENGTH] = {0};
     size_t actual_data_size = 0;
-    err = direct_access_to_devicekey(flash_bd, 0, (uint32_t)(flash_bd->size()), device_key_out, TEST_DEVICEKEY_LENGTH, &actual_data_size);
+    err = direct_access_to_devicekey(flash_bd, 0, (uint32_t)(flash_bd->size()), device_key_out, TEST_DEVICEKEY_LENGTH,
+                                     &actual_data_size);
     TEST_ASSERT_EQUAL_ERROR_CODE(0, err);
 
     /* Assert DeviceKey value and length */
     TEST_ASSERT_EQUAL(actual_data_size, TEST_DEVICEKEY_LENGTH);
     for (int i_ind = 0; i_ind < TEST_DEVICEKEY_LENGTH; i_ind++) {
-    	TEST_ASSERT_EQUAL(device_key_out[i_ind], device_key_in[i_ind]);
+        TEST_ASSERT_EQUAL(device_key_out[i_ind], device_key_in[i_ind]);
     }
 
     delete tdb;
