@@ -22,7 +22,7 @@
 #include "mbed_error.h"
 #include "MbedCRC.h"
 #include "mbed_trace.h"
-#define TRACE_GROUP "BLTL"
+#define TRACE_GROUP "DADK"
 
 using namespace mbed;
 
