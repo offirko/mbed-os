@@ -93,8 +93,8 @@ static int calc_area_params(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t
                             tdbstore_area_data_t *area_params)
 {
     bd_size_t bd_size = 0;
-    bd_size_t inital_erase_size = bd->get_erase_size(tdb_start_offset)
-                                  bd_size_t erase_unit_size = inital_erase_size;
+    bd_size_t inital_erase_size = bd->get_erase_size(tdb_start_offset);
+    bd_size_t erase_unit_size = inital_erase_size;
     size_t cur_area_size = 0;
 
     if ( (tdb_end_offset < (tdb_start_offset + 2 * RESERVED_AREA_SIZE - 1)) || (tdb_end_offset > bd->size()) ) {
