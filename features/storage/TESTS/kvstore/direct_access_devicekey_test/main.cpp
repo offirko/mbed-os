@@ -18,6 +18,10 @@
 #include "mbed.h"
 #include <stdio.h>
 #include <string.h>
+#include "DeviceKey.h"
+#include "KVStore.h"
+#include "KVMap.h"
+#include "kv_config.h"
 #include "TDBStore.h"
 #include "HeapBlockDevice.h"
 #include "FlashSimBlockDevice.h"
@@ -135,6 +139,35 @@ void test_direct_access_to_devicekey_with_offset()
     TEST_ASSERT_EQUAL(0, err);
 }
 
+void test_direct_access_to_device_inject_root()
+{
+    DeviceKey& devkey = DeviceKey::get_instance();
+    uint32_t rkey[DEVICE_KEY_16BYTE / sizeof(uint32_t)];
+    uint32_t key[DEVICE_KEY_16BYTE / sizeof(uint32_t)];
+    KVMap& kv_map = KVMap::get_instance();
+    KVStore *inner_store = kv_map.get_internal_kv_instance(NULL);
+    TEST_ASSERT_NOT_EQUAL(NULL, inner_store);
+
+    BlockDevice *flash_bd = kv_map.get_internal_blockdevice_instance("");
+    TEST_ASSERT_NOT_EQUAL(NULL, flash_bd);
+
+    int ret = inner_store->reset();
+    TEST_ASSERT_EQUAL_INT(DEVICEKEY_SUCCESS, ret);
+
+    memcpy(key, "1234567812345678", sizeof(key));
+    ret = devkey.device_inject_root_of_trust(key, DEVICE_KEY_16BYTE);
+    TEST_ASSERT_EQUAL_INT(DEVICEKEY_SUCCESS, ret);
+
+    // Now use Direct Access To DeviceKey to retrieve it */
+    memset(rkey, 0, sizeof(rkey));
+    size_t actual_data_size = 0;
+    ret = direct_access_to_devicekey(flash_bd, 0, flash_bd->size(), rkey, DEVICE_KEY_16BYTE, &actual_data_size);
+    TEST_ASSERT_EQUAL_ERROR_CODE(0, ret);
+    /* Assert DeviceKey value and length */
+    TEST_ASSERT_EQUAL(actual_data_size, DEVICE_KEY_16BYTE);
+    TEST_ASSERT_EQUAL_INT32_ARRAY(key, rkey, DEVICE_KEY_16BYTE / sizeof(uint32_t));
+}
+
 // Test setup
 utest::v1::status_t greentea_failure_handler(const Case *const source, const failure_t reason)
 {
@@ -145,6 +178,7 @@ utest::v1::status_t greentea_failure_handler(const Case *const source, const fai
 Case cases[] = {
     Case("Testing direct access to devicekey with zero offset", test_direct_access_to_devicekey_zero_offset, greentea_failure_handler),
     Case("Testing direct access to devicekey with given offset ", test_direct_access_to_devicekey_with_offset, greentea_failure_handler),
+    Case("Testing direct access to injected devicekey ", test_direct_access_to_device_inject_root, greentea_failure_handler),
 };
 
 utest::v1::status_t greentea_test_setup(const size_t number_of_cases)
