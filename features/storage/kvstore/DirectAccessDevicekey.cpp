@@ -27,10 +27,6 @@
 using namespace mbed;
 
 // --------------------------------------------------------- Definitions ----------------------------------------------------------
-#define TDBSTORE_NUMBER_OF_AREAS 2
-#define MAX_DEVICEKEY_DATA_SIZE 64
-#define RESERVED_AREA_SIZE (MAX_DEVICEKEY_DATA_SIZE+8) /* DeviceKey Max Data size + 4bytes address + 4bytes deviceKey actual size */
-
 typedef struct {
     uint32_t address;
     size_t   size;
@@ -41,6 +37,10 @@ typedef struct {
     uint16_t data_size;
     uint32_t crc;
 } reserved_trailer_t;
+
+#define TDBSTORE_NUMBER_OF_AREAS 2
+#define MAX_DEVICEKEY_DATA_SIZE 64
+#define RESERVED_AREA_SIZE (MAX_DEVICEKEY_DATA_SIZE+sizeof(reserved_trailer_t)) /* DeviceKey Max Data size + metadata trailer */
 
 // -------------------------------------------------- Local Functions Declaration ----------------------------------------------------
 static int calc_area_params(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t tdb_end_offset,
@@ -93,8 +93,8 @@ static int calc_area_params(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t
                             tdbstore_area_data_t *area_params)
 {
     bd_size_t bd_size = 0;
-    bd_size_t inital_erase_size = bd->get_erase_size(tdb_start_offset);
-    bd_size_t erase_unit_size = inital_erase_size;
+    bd_size_t initial_erase_size = bd->get_erase_size(tdb_start_offset);
+    bd_size_t erase_unit_size = initial_erase_size;
     size_t cur_area_size = 0;
 
     if ( (tdb_end_offset < (tdb_start_offset + 2 * RESERVED_AREA_SIZE - 1)) || (tdb_end_offset > bd->size()) ) {
@@ -112,7 +112,7 @@ static int calc_area_params(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t
 
     area_params[0].address = tdb_start_offset;
     area_params[0].size = cur_area_size;
-    area_params[1].address = cur_area_size;
+    area_params[1].address = tdb_start_offset + cur_area_size;
     area_params[1].size = bd_size - cur_area_size;
     return MBED_SUCCESS;
 }
