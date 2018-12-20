@@ -25,6 +25,7 @@
 #include "TDBStore.h"
 #include "HeapBlockDevice.h"
 #include "FlashSimBlockDevice.h"
+#include "FlashIAPBlockDevice.h"
 #include "SlicingBlockDevice.h"
 #include "DirectAccessDevicekey.h"
 #include "greentea-client/test_env.h"
@@ -36,6 +37,69 @@ using namespace utest::v1;
 using namespace mbed;
 
 #define TEST_DEVICEKEY_LENGTH 32
+
+static inline uint32_t align_up(uint64_t val, uint64_t size)
+{
+    return (((val - 1) / size) + 1) * size;
+}
+
+static inline uint32_t align_down(uint64_t val, uint64_t size)
+{
+    return (((val) / size)) * size;
+}
+
+BlockDevice *_get_test_blockdevice_FLASHIAP(bd_addr_t start_address, bd_size_t size)
+{
+    bd_size_t bd_final_size;
+    bd_addr_t flash_end_address;
+    bd_addr_t flash_start_address;
+    bd_addr_t aligned_start_address;
+    bd_addr_t aligned_end_address;
+    bd_addr_t end_address;
+    FlashIAP flash;
+
+    int ret = flash.init();
+    if (ret != 0) {
+        return NULL;
+    }
+
+    //Get flash parameters before starting
+    flash_start_address = flash.get_flash_start();
+    flash_end_address = flash_start_address + flash.get_flash_size();;
+
+    bool request_default = false;
+    if (start_address == 0 && size == 0) {
+        request_default = true;
+        size = 1;
+    }
+
+    start_address = flash_end_address - size;
+    aligned_start_address = start_address;
+    aligned_start_address = align_down(start_address, flash.get_sector_size(start_address));
+    //Skip this check if default parameters are set (0 for base address and 0 size).
+    //We will calculate the address and size by ourselves
+    if (start_address != aligned_start_address && !request_default) {
+        printf("KV Config: Internal block device start address is not aligned. Consider changing the size parameter");
+        flash.deinit();
+        return NULL;
+    }
+
+    if (request_default) {
+        //update start_address to double the size for TDBStore needs
+        bd_final_size = (flash_end_address - aligned_start_address) * 2;
+        start_address = (flash_end_address - bd_final_size);
+        aligned_start_address = align_down(start_address, flash.get_sector_size(start_address));
+    } else {
+        bd_final_size = (flash_end_address - aligned_start_address);
+    }
+
+    flash.deinit();
+
+    static FlashIAPBlockDevice bd(aligned_start_address, bd_final_size);
+    return &bd;
+}
+
+
 
 void test_direct_access_to_devicekey_zero_offset()
 {
@@ -141,6 +205,7 @@ void test_direct_access_to_devicekey_with_offset()
 
 void test_direct_access_to_device_inject_root()
 {
+	kv_init_storage_config();
     DeviceKey& devkey = DeviceKey::get_instance();
     uint32_t rkey[DEVICE_KEY_16BYTE / sizeof(uint32_t)];
     uint32_t key[DEVICE_KEY_16BYTE / sizeof(uint32_t)];
@@ -159,9 +224,28 @@ void test_direct_access_to_device_inject_root()
     TEST_ASSERT_EQUAL_INT(DEVICEKEY_SUCCESS, ret);
 
     // Now use Direct Access To DeviceKey to retrieve it */
+
+    uint32_t internal_start_address =  MBED_CONF_STORAGE_FILESYSTEM_INTERNAL_BASE_ADDRESS;
+    uint32_t internal_rbp_size =  MBED_CONF_STORAGE_FILESYSTEM_RBP_INTERNAL_SIZE;
+    size_t rbp_num_of_enteries =  MBED_CONF_STORAGE_FILESYSTEM_RBP_NUMBER_OF_ENTRIES;
+    FlashIAPBlockDevice *nbd = NULL;
+
+    if (internal_rbp_size == 0) {
+        internal_rbp_size = 4 * 1024 * rbp_num_of_enteries / 32;
+    }
+
+    bd_addr_t int_st_add = internal_start_address;
+    bd_addr_t int_rbp_size = internal_rbp_size;
+
+    nbd = (FlashIAPBlockDevice *)(_get_test_blockdevice_FLASHIAP(int_st_add, int_rbp_size));
+    TEST_ASSERT_NOT_EQUAL(NULL, nbd);
+    ret = nbd->init();
+    TEST_ASSERT_EQUAL_INT(MBED_SUCCESS, ret);
+
     memset(rkey, 0, sizeof(rkey));
     size_t actual_data_size = 0;
-    ret = direct_access_to_devicekey(flash_bd, 0, flash_bd->size(), rkey, DEVICE_KEY_16BYTE, &actual_data_size);
+
+    ret = direct_access_to_devicekey(nbd, internal_start_address, internal_rbp_size, rkey, DEVICE_KEY_16BYTE, &actual_data_size);
     TEST_ASSERT_EQUAL_ERROR_CODE(0, ret);
     /* Assert DeviceKey value and length */
     TEST_ASSERT_EQUAL(actual_data_size, DEVICE_KEY_16BYTE);
