@@ -15,7 +15,6 @@
  */
 
 // ----------------------------------------------------------- Includes -----------------------------------------------------------
-
 #include "DirectAccessDevicekey.h"
 #include <string.h>
 #include <stdio.h>
@@ -43,27 +42,35 @@ typedef struct {
 #define RESERVED_AREA_SIZE (MAX_DEVICEKEY_DATA_SIZE+sizeof(reserved_trailer_t)) /* DeviceKey Max Data size + metadata trailer */
 
 // -------------------------------------------------- Local Functions Declaration ----------------------------------------------------
-static int calc_area_params(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t tdb_end_offset,
+static int calc_area_params(FlashIAP *flash, uint32_t tdb_start_offset, uint32_t tdb_end_offset,
                             tdbstore_area_data_t *area_params);
-static int reserved_data_get(BlockDevice *bd, tdbstore_area_data_t *area_params, void *reserved_data_buf,
+static int reserved_data_get(FlashIAP *flash, tdbstore_area_data_t *area_params, void *reserved_data_buf,
                              size_t reserved_data_buf_size, size_t *actual_data_size_ptr);
 static uint32_t calc_crc(uint32_t init_crc, uint32_t data_size, const void *data_buf);
 
 // -------------------------------------------------- API Functions Implementation ----------------------------------------------------
-int direct_access_to_devicekey(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t tdb_end_offset, void *data_buf,
+int direct_access_to_devicekey(uint32_t tdb_start_offset, uint32_t tdb_end_offset, void *data_buf,
                                size_t data_buf_size, size_t *actual_data_size_ptr)
 {
     int status = MBED_ERROR_INVALID_ARGUMENT;
+    FlashIAP flash;
     uint8_t active_area = 0;
     tdbstore_area_data_t area_params[TDBSTORE_NUMBER_OF_AREAS];
     memset(area_params, 0, sizeof(area_params));
 
     if (NULL == data_buf) {
         tr_error("Invalid Data Buf Argument");
+
         goto exit_point;
     }
 
-    status = calc_area_params(bd, tdb_start_offset, tdb_end_offset, area_params);
+    status = flash.init();
+    if (status != 0) {
+        tr_error("FlashIAP init failed - err: %d", status);
+        goto exit_point;
+    }
+
+    status = calc_area_params(&flash, tdb_start_offset, tdb_end_offset, area_params);
     if (status != MBED_SUCCESS) {
         tr_error("Couldn't calulate Area Params - err: %d", status);
         goto exit_point;
@@ -72,7 +79,7 @@ int direct_access_to_devicekey(BlockDevice *bd, uint32_t tdb_start_offset, uint3
     /* DeviceKey data can be found either in first or second Flash Area */
     /* Loop through Areas to find valid DeviceKey data */
     for (active_area = 0; active_area < TDBSTORE_NUMBER_OF_AREAS; active_area++) {
-        status = reserved_data_get(bd, &area_params[active_area], data_buf, data_buf_size, actual_data_size_ptr);
+        status = reserved_data_get(&flash, &area_params[active_area], data_buf, data_buf_size, actual_data_size_ptr);
         if (status == MBED_SUCCESS) {
             break;
         }
@@ -89,24 +96,25 @@ exit_point:
 }
 
 // -------------------------------------------------- Local Functions Implementation ----------------------------------------------------
-static int calc_area_params(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t tdb_end_offset,
+static int calc_area_params(FlashIAP *flash, uint32_t tdb_start_offset, uint32_t tdb_end_offset,
                             tdbstore_area_data_t *area_params)
 {
-    bd_size_t bd_size = 0;
-    bd_size_t initial_erase_size = bd->get_erase_size(tdb_start_offset);
-    bd_size_t erase_unit_size = initial_erase_size;
+    uint32_t bd_size = 0;
+    uint32_t initial_erase_size = flash->get_sector_size(tdb_start_offset);
+    uint32_t erase_unit_size = initial_erase_size;
     size_t cur_area_size = 0;
 
-    if ( (tdb_end_offset < (tdb_start_offset + 2 * RESERVED_AREA_SIZE - 1)) || (tdb_end_offset > bd->size()) ) {
-        tr_error();
+    if ( (tdb_end_offset < (tdb_start_offset + 2 * RESERVED_AREA_SIZE - 1)) ||
+            (tdb_end_offset > flash->get_flash_size()) ) {
+        tr_error("calc_area_params failed - Invalid input addresses");
         return MBED_ERROR_INVALID_ARGUMENT;
     }
 
     // Entire TDBStore can't exceed 32 bits
-    bd_size = (bd_size_t)(tdb_end_offset - tdb_start_offset + 1);
+    bd_size = (tdb_end_offset - tdb_start_offset + 1);
 
     while (cur_area_size < bd_size / 2) {
-        erase_unit_size = bd->get_erase_size(tdb_start_offset + cur_area_size);
+        erase_unit_size = flash->get_sector_size(tdb_start_offset + cur_area_size);
         cur_area_size += erase_unit_size;
     }
 
@@ -117,7 +125,7 @@ static int calc_area_params(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t
     return MBED_SUCCESS;
 }
 
-static int reserved_data_get(BlockDevice *bd, tdbstore_area_data_t *area_params, void *reserved_data_buf,
+static int reserved_data_get(FlashIAP *flash, tdbstore_area_data_t *area_params, void *reserved_data_buf,
                              size_t reserved_data_buf_size, size_t *actual_data_size_ptr)
 {
     int status = MBED_SUCCESS;;
@@ -128,10 +136,10 @@ static int reserved_data_get(BlockDevice *bd, tdbstore_area_data_t *area_params,
     size_t actual_size = 0;
     uint32_t initial_crc = 0xFFFFFFFF;
     uint32_t crc = initial_crc;
-    uint8_t blank = bd->get_erase_value();
+    uint8_t blank = flash->get_erase_value();
 
     /* Read Into trailer deviceKey metadata */
-    ret = bd->read(&trailer, area_params->address + MAX_DEVICEKEY_DATA_SIZE, sizeof(trailer));
+    ret = flash->read(&trailer, area_params->address + MAX_DEVICEKEY_DATA_SIZE, sizeof(trailer));
     if (ret != MBED_SUCCESS) {
         status =  MBED_ERROR_READ_FAILED;
         goto exit_point;
@@ -160,11 +168,10 @@ static int reserved_data_get(BlockDevice *bd, tdbstore_area_data_t *area_params,
         goto exit_point;
     }
 
-
     buf = reinterpret_cast <uint8_t *>(reserved_data_buf);
 
     /* Read DeviceKey Data */
-    ret = bd->read(buf, area_params->address, (uint32_t)actual_size);
+    ret = flash->read(buf, area_params->address, (uint32_t)actual_size);
     if (ret != MBED_SUCCESS) {
         status = MBED_ERROR_READ_FAILED;
         goto exit_point;

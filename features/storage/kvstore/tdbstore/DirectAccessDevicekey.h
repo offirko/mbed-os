@@ -17,10 +17,10 @@
 #ifndef MBED_DIRECT_ACCESS_DEVICEKEY_H
 #define MBED_DIRECT_ACCESS_DEVICEKEY_H
 
-#include "BlockDevice.h"
+#include "FlashIAP.h"
 #include <stdio.h>
 
-int direct_access_to_devicekey(BlockDevice *bd, uint32_t tdb_start_offset, uint32_t tdb_end_offset, void *data_buf,
+int direct_access_to_devicekey(uint32_t tdb_start_offset, uint32_t tdb_end_offset, void *data_buf,
                                size_t data_buf_size, size_t *actual_data_size_ptr);
 
 #endif /* MBED_DIRECT_ACCESS_DEVICEKEY_H */
