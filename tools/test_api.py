@@ -933,15 +933,16 @@ class SingleTestRunner(object):
             reset_tout = mut.get('reset_tout')  # COPY_IMAGE -> RESET_PROC -> SLEEP(RESET_TOUT)
 
             # When the build and test system were separate, this was relative to a
-            # base network folder base path: join(NETWORK_BASE_PATH, )
-            image_path = image
+            # base network folder base path: join(NETWORK_BASE_PATH, ).
+            # "image" is now a list representing a development image and an update image
+            # (for device management). When testing, we only use the development image.
+            image_path = image[0]
 
             # Host test execution
             start_host_exec_time = time()
 
             single_test_result = self.TEST_RESULT_UNDEF # single test run result
             _copy_method = selected_copy_method
-
             if not exists(image_path):
                 single_test_result = self.TEST_RESULT_NO_IMAGE
                 elapsed_time = 0
@@ -2229,7 +2230,7 @@ def build_tests(tests, base_source_paths, build_path, target, toolchain_name,
                 clean=False, notify=None, jobs=1, macros=None,
                 silent=False, report=None, properties=None,
                 continue_on_build_fail=False, app_config=None,
-                build_profile=None, stats_depth=None, ignore=None):
+                build_profile=None, stats_depth=None, ignore=None, spe_build=False):
     """Given the data structure from 'find_tests' and the typical build parameters,
     build all the tests
 
@@ -2287,7 +2288,8 @@ def build_tests(tests, base_source_paths, build_path, target, toolchain_name,
             'build_profile': build_profile,
             'toolchain_paths': TOOLCHAIN_PATHS,
             'stats_depth': stats_depth,
-            'notify': MockNotifier()
+            'notify': MockNotifier(),
+            'spe_build': spe_build
         }
 
         results.append(p.apply_async(build_test_worker, args, kwargs))

@@ -13,11 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "ns_types.h"
-#include "rf_configuration.h"
-#include "mbed_trace.h"
 
-#define TRACE_GROUP "rfcf"
+#include "rf_configuration.h"
 
 // Note that F_XO and F_DIG depends on the used clock frequency
 #define F_XO    50000000
@@ -104,7 +101,7 @@ void rf_conf_calculate_rx_filter_bandwidth_registers(uint32_t rx_bandwidth, uint
     uint8_t chflt_e_tmp = 0;
     uint8_t chflt_m_tmp = 0;
 
-    while (rx_bandwidth < 900000 / (2 << chflt_e_tmp)) {
+    while (rx_bandwidth < 900000u / (2 << chflt_e_tmp)) {
         chflt_e_tmp++;
     }
     uint32_t rx_bandwidth_tmp = rx_bandwidth;

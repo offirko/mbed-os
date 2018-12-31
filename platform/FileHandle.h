@@ -1,5 +1,6 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2017 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -136,6 +137,21 @@ public:
      *  @return         Size of the file in bytes
      */
     virtual off_t size();
+
+    /** Truncate or extend a file.
+     *
+     * The file's length is set to the specified value. The seek pointer is
+     * not changed. If the file is extended, the extended area appears as if
+     * it were zero-filled.
+     *
+     *  @param length   The requested new length for the file
+     *
+     *  @return         Zero on success, negative error code on failure
+     */
+    virtual int truncate(off_t length)
+    {
+        return -EINVAL;
+    }
 
     /** Move the file position to a given offset from a given location.
      *

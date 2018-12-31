@@ -1,5 +1,6 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2006-2015 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -839,6 +840,23 @@ extern "C" off_t lseek(int fildes, off_t offset, int whence)
         return -1;
     }
     return off;
+}
+
+extern "C" int ftruncate(int fildes, off_t length)
+{
+    FileHandle *fhc = get_fhc(fildes);
+    if (fhc == NULL) {
+        errno = EBADF;
+        return -1;
+    }
+
+    int err = fhc->truncate(length);
+    if (err < 0) {
+        errno = -err;
+        return -1;
+    } else {
+        return 0;
+    }
 }
 
 #ifdef __ARMCC_VERSION

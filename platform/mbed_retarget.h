@@ -1,6 +1,7 @@
 /*
  * mbed Microcontroller Library
  * Copyright (c) 2006-2016 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -523,6 +524,7 @@ extern "C" {
     ssize_t write(int fildes, const void *buf, size_t nbyte);
     ssize_t read(int fildes, void *buf, size_t nbyte);
     off_t lseek(int fildes, off_t offset, int whence);
+    int ftruncate(int fildes, off_t length);
     int isatty(int fildes);
     int fsync(int fildes);
     int fstat(int fildes, struct stat *st);

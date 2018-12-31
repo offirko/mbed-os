@@ -37,12 +37,19 @@ from ..utils import (json_file_to_dict, intelhex_offset, integer,
 from ..arm_pack_manager import Cache
 from ..targets import (CUMULATIVE_ATTRIBUTES, TARGET_MAP, generate_py_target,
                        get_resolution_order, Target)
+from ..settings import DELIVERY_DIR
 
 try:
     unicode
 except NameError:
     unicode = str
-PATH_OVERRIDES = set(["target.bootloader_img"])
+PATH_OVERRIDES = set([
+    "target.bootloader_img"
+])
+DELIVERY_OVERRIDES = set([
+    "target.deliver_to_target",
+    "target.deliver_artifacts",
+])
 ROM_OVERRIDES = set([
     # managed BL
     "target.bootloader_img", "target.restrict_size",
@@ -60,16 +67,11 @@ RAM_OVERRIDES = set([
     "target.mbed_ram_start", "target.mbed_ram_size",
 ])
 
-BOOTLOADER_OVERRIDES = ROM_OVERRIDES | RAM_OVERRIDES
+BOOTLOADER_OVERRIDES = ROM_OVERRIDES | RAM_OVERRIDES | DELIVERY_OVERRIDES
 
 
 ALLOWED_FEATURES = [
-    "BOOTLOADER","UVISOR", "BLE", "CLIENT", "IPV4", "LWIP", "COMMON_PAL", "STORAGE",
-    "NANOSTACK","CRYPTOCELL310",
-    # Nanostack configurations
-    "LOWPAN_BORDER_ROUTER", "LOWPAN_HOST", "LOWPAN_ROUTER", "NANOSTACK_FULL",
-    "THREAD_BORDER_ROUTER", "THREAD_END_DEVICE", "THREAD_ROUTER",
-    "ETHERNET_HOST",
+    "BOOTLOADER", "BLE", "LWIP", "STORAGE", "NANOSTACK", "CRYPTOCELL310",
 ]
 
 # List of all possible ram memories that can be available for a target
@@ -122,6 +124,7 @@ class ConfigParameter(object):
         self.accepted_values = data.get("accepted_values")
         self.help_text       = data.get("help", None)
         self.required        = data.get("required", False)
+        self.conflicts       = data.get("conflicts", [])
         self.macro_name      = data.get("macro_name", "MBED_CONF_%s" %
                                    self.sanitize(self.name.upper()))
         self.config_errors = []
@@ -249,6 +252,8 @@ class ConfigParameter(object):
             return desc + "    No value set"
         desc += "    Macro name: %s\n" % self.macro_name
         desc += "    Value: %s (set by %s)" % (self.value, self.set_by)
+        if self.conflicts:
+            desc += "    Conflicts with %s" % ", ".join(self.conflicts)
         return desc
 
 class ConfigMacro(object):
@@ -506,10 +511,17 @@ class Config(object):
                     self.app_config_data.get("custom_targets", {}), tgt)
         self.target = deepcopy(self.target)
         self.target_labels = self.target.labels
+        po_without_target = set(o.split(".")[1] for o in PATH_OVERRIDES)
         for override in BOOTLOADER_OVERRIDES:
             _, attr = override.split(".")
             if not hasattr(self.target, attr):
                 setattr(self.target, attr, None)
+            elif attr in po_without_target:
+                new_path = join(
+                    dirname(self.target._from_file),
+                    getattr(self.target, attr)
+                )
+                setattr( self.target, attr, new_path)
 
         self.cumulative_overrides = {key: ConfigCumulativeOverride(key)
                                      for key in CUMULATIVE_ATTRIBUTES}
@@ -586,6 +598,17 @@ class Config(object):
                 return True
         return False
 
+    def deliver_into(self):
+        if self.target.deliver_to_target:
+            label_dir = "TARGET_{}".format(self.target.deliver_to_target)
+            target_delivery_dir = join(DELIVERY_DIR, label_dir)
+            if not exists(target_delivery_dir):
+                os.makedirs(target_delivery_dir)
+
+            return target_delivery_dir, self.target.deliver_artifacts
+        else:
+            return None, None
+
     @property
     def sectors(self):
         """Return a list of tuples of sector start,size"""
@@ -622,21 +645,21 @@ class Config(object):
         raise ConfigException(exception_text)
 
     def get_all_active_memories(self, memory_list):
-        """Get information of all available rom/ram memories in the form of dictionary 
-        {Memory: [start_addr, size]}. Takes in the argument, a list of all available 
+        """Get information of all available rom/ram memories in the form of dictionary
+        {Memory: [start_addr, size]}. Takes in the argument, a list of all available
         regions within the ram/rom memory"""
         # Override rom_start/rom_size
         #
         # This is usually done for a target which:
         # 1. Doesn't support CMSIS pack, or
         # 2. Supports TrustZone and user needs to change its flash partition
-        
+
         available_memories = {}
         # Counter to keep track of ROM/RAM memories supported by target
         active_memory_counter = 0
         # Find which memory we are dealing with, RAM/ROM
         active_memory = 'ROM' if any('ROM' in mem_list for mem_list in memory_list) else 'RAM'
-        
+
         try:
             cmsis_part = self._get_cmsis_part()
         except ConfigException:
@@ -655,7 +678,7 @@ class Config(object):
 
         present_memories = set(cmsis_part['memory'].keys())
         valid_memories = set(memory_list).intersection(present_memories)
-        
+
         for memory in valid_memories:
             mem_start, mem_size = self._get_mem_specs(
                 [memory],
@@ -681,7 +704,7 @@ class Config(object):
             mem_start = int(mem_start, 0)
             mem_size = int(mem_size, 0)
             available_memories[memory] = [mem_start, mem_size]
-        
+
         return available_memories
 
     @property
@@ -750,7 +773,7 @@ class Config(object):
         newstart = rom_start + integer(new_offset, 0)
         if newstart < start:
             raise ConfigException(
-                "Can not place % region inside previous region" % region_name)
+                "Can not place %r region inside previous region" % region_name)
         return newstart
 
     def _generate_bootloader_build(self, rom_memories):
@@ -769,8 +792,19 @@ class Config(object):
             if part.minaddr() != rom_start:
                 raise ConfigException("bootloader executable does not "
                                       "start at 0x%x" % rom_start)
-            part_size = (part.maxaddr() - part.minaddr()) + 1
-            part_size = Config._align_ceiling(rom_start + part_size, self.sectors) - rom_start
+
+            # find the last valid address that's within rom_end and use that
+            # to compute the bootloader size
+            end_address = None
+            for start, stop in part.segments():
+                if (stop < rom_end):
+                    end_address = stop
+                else:
+                    break
+            if end_address == None:
+                raise ConfigException("bootloader segments don't fit within rom region")
+            part_size = Config._align_ceiling(end_address, self.sectors) - rom_start
+
             yield Region("bootloader", rom_start, part_size, False,
                          filename)
             start = rom_start + part_size
@@ -781,9 +815,14 @@ class Config(object):
                 start, region = self._make_header_region(
                     start, self.target.header_format)
                 yield region._replace(filename=self.target.header_format)
+
         if self.target.restrict_size is not None:
             new_size = int(self.target.restrict_size, 0)
             new_size = Config._align_floor(start + new_size, self.sectors) - start
+
+            if self.target.app_offset:
+                start = self._assign_new_offset(rom_start, start, self.target.app_offset, "application")
+
             yield Region("application", start, new_size, True, None)
             start += new_size
             if self.target.header_format and not self.target.bootloader_img:
@@ -793,9 +832,7 @@ class Config(object):
                 start, region = self._make_header_region(
                     start, self.target.header_format)
                 yield region
-            if self.target.app_offset:
-                start = self._assign_new_offset(
-                    rom_start, start, self.target.app_offset, "application")
+
             yield Region("post_application", start, rom_end - start,
                          False, None)
         else:
@@ -804,7 +841,7 @@ class Config(object):
                     rom_start, start, self.target.app_offset, "application")
             yield Region("application", start, rom_end - start,
                          True, None)
-        if start > rom_start + rom_size:
+        if start > rom_end:
             raise ConfigException("Not enough memory on device to fit all "
                                   "application regions")
 
@@ -1050,17 +1087,37 @@ class Config(object):
                                       "' doesn't have a value")
 
     @staticmethod
-    def parameters_to_macros(params):
-        """ Encode the configuration parameters as C macro definitions.
+    def _parameters_and_config_macros_to_macros(params, macros):
+        """ Return the macro definitions generated for a dictionary of
+        ConfigParameters and a dictionary of ConfigMacros (as returned by
+        get_config_data). The ConfigParameters override any matching macros set
+        by the ConfigMacros.
 
         Positional arguments:
         params - a dictionary mapping a name to a ConfigParameter
+        macros - a dictionary mapping a name to a ConfigMacro
 
-        Return: a list of strings that encode the configuration parameters as
-        C pre-processor macros
+        Return: a list of strings that are the C pre-processor macros
         """
-        return ['%s=%s' % (m.macro_name, m.value) for m in params.values()
-                if m.value is not None]
+        all_macros = {
+            m.macro_name: m.macro_value for m in macros.values()
+        }
+
+        parameter_macros = {
+            p.macro_name: p.value for p in params.values() if p.value is not None
+        }
+
+        all_macros.update(parameter_macros)
+        macro_list = []
+        for name, value in all_macros.items():
+            # If the macro does not have a value, just append the name.
+            # Otherwise, append the macro as NAME=VALUE
+            if value is None:
+                macro_list.append(name)
+            else:
+                macro_list.append("%s=%s" % (name, value))
+
+        return macro_list
 
     @staticmethod
     def config_macros_to_macros(macros):
@@ -1084,8 +1141,7 @@ class Config(object):
         """
         params, macros = config[0], config[1]
         Config._check_required_parameters(params)
-        return Config.config_macros_to_macros(macros) + \
-            Config.parameters_to_macros(params)
+        return Config._parameters_and_config_macros_to_macros(params, macros)
 
     def get_config_data_macros(self):
         """ Convert a Config object to a list of C macros
@@ -1176,6 +1232,28 @@ class Config(object):
                 continue
             else:
                 raise error
+        for param in params.values():
+            for conflict in param.conflicts:
+                if conflict in BOOTLOADER_OVERRIDES:
+                    _, attr = conflict.split(".")
+                    conf = ConfigParameter(
+                        conflict, {"value": getattr(self.target, attr)},
+                        "target", "target"
+                    )
+                else:
+                    conf = params.get(conflict)
+                if (
+                    param.value and conf and conf.value
+                    and param.value != conf.value
+                ):
+                    raise ConfigException(
+                        ("Configuration parameter {} with value {} conflicts "
+                         "with {} with value {}").format(
+                             param.name, param.value, conf.name, conf.value
+                        )
+                    )
+
+
         return True
 
 

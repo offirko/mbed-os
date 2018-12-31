@@ -264,7 +264,7 @@ BlockDevice *_get_blockdevice_FLASHIAP(bd_addr_t start_address, bd_size_t size)
     }
 
     //Get flash parameters before starting
-    flash_first_writable_sector_address = align_up(FLASHIAP_ROM_END, flash.get_sector_size(FLASHIAP_ROM_END));
+    flash_first_writable_sector_address = align_up(FLASHIAP_APP_ROM_END_ADDR, flash.get_sector_size(FLASHIAP_APP_ROM_END_ADDR));
     flash_start_address = flash.get_flash_start();
     flash_end_address = flash_start_address + flash.get_flash_size();;
 
@@ -551,7 +551,7 @@ int _storage_config_TDB_INTERNAL()
         if (flash.init() != 0) {
             return MBED_ERROR_FAILED_OPERATION;
         }
-        internal_start_address = align_up(FLASHIAP_ROM_END, flash.get_sector_size(FLASHIAP_ROM_END));
+        internal_start_address = align_up(FLASHIAP_APP_ROM_END_ADDR, flash.get_sector_size(FLASHIAP_APP_ROM_END_ADDR));
         flash.deinit();
     }
 
@@ -572,6 +572,12 @@ int _storage_config_TDB_INTERNAL()
         return MBED_ERROR_INVALID_ARGUMENT;
     }
 
+    ret = kvstore_config.internal_bd->deinit();
+    if (ret != MBED_SUCCESS) {
+        tr_error("KV Config: Fail to deinit internal BlockDevice.");
+        return MBED_ERROR_FAILED_OPERATION;
+    }
+
     static TDBStore tdb_internal(kvstore_config.internal_bd);
     kvstore_config.internal_store = &tdb_internal;
 
@@ -584,7 +590,7 @@ int _storage_config_TDB_INTERNAL()
         kvstore_config.internal_store;
 
     kvstore_config.flags_mask = ~(KVStore::REQUIRE_CONFIDENTIALITY_FLAG |
-                                  KVStore::REQUIRE_INTEGRITY_FLAG | KVStore::REQUIRE_REPLAY_PROTECTION_FLAG);
+                                  KVStore::REQUIRE_REPLAY_PROTECTION_FLAG);
 
     KVMap &kv_map = KVMap::get_instance();
     ret = kv_map.init();
@@ -737,7 +743,7 @@ int _storage_config_tdb_external_common()
 
     if (_calculate_blocksize_match_tdbstore(kvstore_config.external_bd) != MBED_SUCCESS) {
         tr_error("KV Config: Can not create TDBStore with less then 2 sector.");
-        return MBED_ERROR_INVALID_ARGUMENT;
+        return MBED_ERROR_INVALID_SIZE;
     }
 
     static TDBStore tdb_external(kvstore_config.external_bd);

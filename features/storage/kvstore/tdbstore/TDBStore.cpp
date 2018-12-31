@@ -22,7 +22,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "mbed_error.h"
-#include "mbed_assert.h"
 #include "mbed_wait_api.h"
 #include "MbedCRC.h"
 
@@ -33,6 +32,8 @@ using namespace mbed;
 static const uint32_t delete_flag = (1UL << 31);
 static const uint32_t internal_flags = delete_flag;
 static const uint32_t supported_flags = KVStore::WRITE_ONCE_FLAG;
+
+namespace {
 
 typedef struct {
     uint32_t magic;
@@ -93,6 +94,8 @@ typedef struct {
     uint32_t ram_table_ind;
     char *prefix;
 } key_iterator_handle_t;
+
+} // anonymous namespace
 
 
 // -------------------------------------------------- Local Functions Declaration ----------------------------------------------------
@@ -227,6 +230,11 @@ int TDBStore::read_record(uint8_t area, uint32_t offset, char *key,
     }
 
     total_size = key_size + data_size;
+
+    // Make sure our read sizes didn't cause any wraparounds
+    if ((total_size < key_size) || (total_size < data_size)) {
+        return MBED_ERROR_INVALID_DATA_DETECTED;
+    }
 
     if (offset + total_size >= _size) {
         return MBED_ERROR_INVALID_DATA_DETECTED;
@@ -883,6 +891,7 @@ int TDBStore::build_ram_table()
 
         if (ret == MBED_ERROR_ITEM_NOT_FOUND) {
             // Key doesn't exist, need to add it to RAM table
+            ret = MBED_SUCCESS;
 
             if (flags & delete_flag) {
                 continue;
@@ -945,6 +954,10 @@ int TDBStore::init()
     uint16_t versions[_num_areas];
 
     _mutex.lock();
+
+    if (_is_initialized) {
+        goto end;
+    }
 
     _max_keys = initial_max_keys;
 

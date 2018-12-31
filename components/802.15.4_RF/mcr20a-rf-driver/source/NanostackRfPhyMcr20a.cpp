@@ -15,7 +15,7 @@
  */
 #include "NanostackRfPhyMcr20a.h"
 
-#if defined(MBED_CONF_NANOSTACK_CONFIGURATION) && DEVICE_SPI
+#if defined(MBED_CONF_NANOSTACK_CONFIGURATION) && DEVICE_SPI && defined(MBED_CONF_RTOS_PRESENT)
 
 #include "ns_types.h"
 #include "platform/arm_hal_interrupt.h"
@@ -65,6 +65,8 @@ extern "C" {
 #define gXcvrLowPowerState_d  gXcvrPwrAutodoze_c
 #endif
 
+namespace {
+
 /* MCR20A XCVR states */
 typedef enum xcvrState_tag {
     gIdle_c,
@@ -105,6 +107,8 @@ typedef enum {
     RX_AACK_ON = 0x16,
     TX_ARET_ON = 0x19
 } rf_trx_states_t;
+
+} // anonymous namespace
 
 /*RF receive buffer*/
 static uint8_t rf_buffer[RF_BUFFER_SIZE];
