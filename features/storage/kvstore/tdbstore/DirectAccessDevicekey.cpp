@@ -61,7 +61,6 @@ int direct_access_to_devicekey(uint32_t tdb_start_offset, uint32_t tdb_end_offse
 
     if (NULL == data_buf) {
         tr_error("Invalid Data Buf Argument");
-
         goto exit_point;
     }
 
@@ -112,7 +111,7 @@ static int calc_area_params(FlashIAP *flash, uint32_t tdb_start_offset, uint32_t
     size_t cur_area_size = 0;
 
     if ( (tdb_end_offset < (tdb_start_offset + 2 * RESERVED_AREA_SIZE - 1)) ||
-            (tdb_end_offset > flash->get_flash_size()) ) {
+            (tdb_end_offset > (flash->get_flash_start() + flash->get_flash_size())) ) {
         tr_error("calc_area_params failed - Invalid input addresses");
         return MBED_ERROR_INVALID_ARGUMENT;
     }
@@ -129,6 +128,7 @@ static int calc_area_params(FlashIAP *flash, uint32_t tdb_start_offset, uint32_t
     area_params[0].size = cur_area_size;
     area_params[1].address = tdb_start_offset + cur_area_size;
     area_params[1].size = bd_size - cur_area_size;
+
     return MBED_SUCCESS;
 }
 

@@ -65,8 +65,8 @@ int  get_virtual_TDBStore_position(uint32_t conf_start_address, uint32_t conf_si
         return -1;
     }
 
-    uint32_t flash_first_writable_sector_address = (uint32_t)(align_up(FLASHIAP_ROM_END/*FLASHIAP_APP_ROM_END_ADDR*/,
-            flash.get_sector_size(FLASHIAP_ROM_END/*FLASHIAP_APP_ROM_END_ADDR*/)));
+    uint32_t flash_first_writable_sector_address = (uint32_t)(align_up(FLASHIAP_APP_ROM_END_ADDR,
+            flash.get_sector_size(FLASHIAP_APP_ROM_END_ADDR)));
 
     //Get flash parameters before starting
     flash_start_address = flash.get_flash_start();
@@ -239,9 +239,21 @@ void test_direct_access_to_device_inject_root()
     ret = devkey.device_inject_root_of_trust(key, DEVICE_KEY_16BYTE);
     TEST_ASSERT_EQUAL_INT(DEVICEKEY_SUCCESS, ret);
 
+
     // Now use Direct Access To DeviceKey to retrieve it */
+#if MBED_CONF_STORAGE_STORAGE_TYPE == FILESYSTEM
     uint32_t internal_start_address =  MBED_CONF_STORAGE_FILESYSTEM_INTERNAL_BASE_ADDRESS;
     uint32_t internal_rbp_size =  MBED_CONF_STORAGE_FILESYSTEM_RBP_INTERNAL_SIZE;
+#elif MBED_CONF_STORAGE_STORAGE_TYPE == TDB_EXTERNAL
+    uint32_t internal_start_address =  MBED_CONF_STORAGE_TDB_EXTERNAL_INTERNAL_BASE_ADDRESS;
+    uint32_t internal_rbp_size =  MBED_CONF_STORAGE_TDB_EXTERNAL_RBP_INTERNAL_SIZE;
+#elif MBED_CONF_STORAGE_STORAGE_TYPE == TDB_INTERNAL
+    uint32_t internal_start_address =  MBED_CONF_STORAGE_TDB_INTERNAL_INTERNAL_BASE_ADDRESS;
+    uint32_t internal_rbp_size =  MBED_CONF_STORAGE_TDB_INTERNAL_INTERNAL_SIZE;
+#else
+    TEST_SKIP_UNLESS_MESSAGE(false, "Test skipped. No KVStore Internal");
+    TEST_SKIP....
+#endif
 
     uint32_t tdb_st_add = 0;
     uint32_t tdb_end_add = 0;
@@ -252,6 +264,13 @@ void test_direct_access_to_device_inject_root()
 
     memset(rkey, 0, sizeof(rkey));
     size_t actual_data_size = 0;
+    ret = ((TDBStore *)inner_store)->reserved_data_get(rkey, DEVICE_KEY_16BYTE, &actual_data_size);
+    TEST_ASSERT_EQUAL_ERROR_CODE(0, ret);
+    TEST_ASSERT_EQUAL(actual_data_size, DEVICE_KEY_16BYTE);
+    TEST_ASSERT_EQUAL_INT32_ARRAY(key, rkey, DEVICE_KEY_16BYTE / sizeof(uint32_t));
+
+    memset(rkey, 0, sizeof(rkey));
+    actual_data_size = 0;
 
     ret = direct_access_to_devicekey(tdb_st_add, tdb_end_add, rkey, DEVICE_KEY_16BYTE, &actual_data_size);
     TEST_ASSERT_EQUAL_ERROR_CODE(0, ret);
