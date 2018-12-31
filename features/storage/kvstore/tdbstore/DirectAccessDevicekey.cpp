@@ -57,6 +57,7 @@ int direct_access_to_devicekey(uint32_t tdb_start_offset, uint32_t tdb_end_offse
     uint8_t active_area = 0;
     tdbstore_area_data_t area_params[TDBSTORE_NUMBER_OF_AREAS];
     memset(area_params, 0, sizeof(area_params));
+    bool is_flash_init = false;
 
     if (NULL == data_buf) {
         tr_error("Invalid Data Buf Argument");
@@ -69,6 +70,8 @@ int direct_access_to_devicekey(uint32_t tdb_start_offset, uint32_t tdb_end_offse
         tr_error("FlashIAP init failed - err: %d", status);
         goto exit_point;
     }
+
+    is_flash_init = true;
 
     status = calc_area_params(&flash, tdb_start_offset, tdb_end_offset, area_params);
     if (status != MBED_SUCCESS) {
@@ -91,6 +94,10 @@ int direct_access_to_devicekey(uint32_t tdb_start_offset, uint32_t tdb_end_offse
     }
 
 exit_point:
+    if (true == is_flash_init) {
+        flash.deinit();
+        is_flash_init = false;
+    }
 
     return status;
 }
