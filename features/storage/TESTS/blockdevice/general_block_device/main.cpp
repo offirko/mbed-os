@@ -27,6 +27,10 @@
 #include "BufferedBlockDevice.h"
 #include "BlockDevice.h"
 
+/* OFR_DBG */
+#include "mbed.h"
+
+
 #if COMPONENT_SPIF
 #include "SPIFBlockDevice.h"
 #endif
@@ -49,7 +53,7 @@
 
 using namespace utest::v1;
 
-#define TEST_BLOCK_COUNT 10
+#define TEST_BLOCK_COUNT 1000
 #define TEST_ERROR_MASK 16
 #define TEST_NUM_OF_THREADS 5
 #define TEST_THREAD_STACK_SIZE 1024
@@ -180,74 +184,6 @@ static BlockDevice *get_bd_instance(uint8_t bd_type)
     return NULL;
 }
 
-// Mutex is protecting rand() per srand for buffer writing and verification.
-// Mutex is also protecting printouts for clear logs.
-// Mutex is NOT protecting Block Device actions: erase/program/read - which is the purpose of the multithreaded test!
-void basic_erase_program_read_test(BlockDevice *block_device, bd_size_t block_size, uint8_t *write_block,
-                                   uint8_t *read_block, unsigned addrwidth, int thread_num)
-{
-    int err = 0;
-    _mutex->lock();
-
-    // Make sure block address per each test is unique
-    static unsigned block_seed = 1;
-    srand(block_seed++);
-
-    // Find a random block
-    int threaded_rand_number = (rand() * TEST_NUM_OF_THREADS) + thread_num;
-    bd_addr_t block = (threaded_rand_number * block_size) % block_device->size();
-
-    // Flashiap boards with inconsistent sector size will not align with random start addresses
-    if (bd_arr[test_iteration] == flashiap) {
-        block = 0;
-    }
-
-    // Use next random number as temporary seed to keep
-    // the address progressing in the pseudorandom sequence
-    unsigned seed = rand();
-
-    // Fill with random sequence
-    srand(seed);
-    for (bd_size_t i_ind = 0; i_ind < block_size; i_ind++) {
-        write_block[i_ind] = 0xff & rand();
-    }
-    // Write, sync, and read the block
-    utest_printf("test  %0*llx:%llu...\n", addrwidth, block, block_size);
-
-    // Thread test for flashiap write to the same sector, so all write/read/erase actions should be locked
-    if (bd_arr[test_iteration] != flashiap) {
-        _mutex->unlock();
-    }
-
-    err = block_device->erase(block, block_size);
-    TEST_ASSERT_EQUAL(0, err);
-
-    err = block_device->program(write_block, block, block_size);
-    TEST_ASSERT_EQUAL(0, err);
-
-    err = block_device->read(read_block, block, block_size);
-    TEST_ASSERT_EQUAL(0, err);
-
-    if (bd_arr[test_iteration] != flashiap) {
-        _mutex->lock();
-    }
-
-    // Check that the data was unmodified
-    srand(seed);
-    int val_rand;
-    for (bd_size_t i_ind = 0; i_ind < block_size; i_ind++) {
-        val_rand = rand();
-        if ((0xff & val_rand) != read_block[i_ind]) {
-            utest_printf("\n Assert Failed Buf Read - block:size: %llx:%llu \n", block, block_size);
-            utest_printf("\n pos: %llu, exp: %02x, act: %02x, wrt: %02x \n", i_ind, (0xff & val_rand),
-                         read_block[i_ind],
-                         write_block[i_ind]);
-        }
-        TEST_ASSERT_EQUAL(0xff & val_rand, read_block[i_ind]);
-    }
-    _mutex->unlock();
-}
-
 void test_init_bd()
 {
     utest_printf("\nTest Init block device.\n");
@@ -260,122 +196,216 @@ void test_init_bd()
     TEST_ASSERT_EQUAL(0, err);
 }
 
-void test_random_program_read_erase()
+
+/*******************************************************************************************/
+
+#define SAMPLE_TIME             2000    // msec
+#define LOOP_TIME               3000    // msec
+#define L_NUM_WORKER_THREADS 1
+ 
+uint64_t prev_idle_time = 0;
+int32_t wait_time = 5000;      // usec
+
+void calc_cpu_usage()
 {
-    utest_printf("\nTest Random Program Read Erase Starts..\n");
-
-    TEST_SKIP_UNLESS_MESSAGE(block_device != NULL, "no block device found.");
-
-    for (unsigned atr = 0; atr < sizeof(ATTRS) / sizeof(ATTRS[0]); atr++) {
-        static const char *prefixes[] = {"", "k", "M", "G"};
-        for (int i_ind = 3; i_ind >= 0; i_ind--) {
-            bd_size_t size = (block_device->*ATTRS[atr].method)();
-            if (size >= (1ULL << 10 * i_ind)) {
-                utest_printf("%s: %llu%sbytes (%llubytes)\n",
-                             ATTRS[atr].name, size >> 10 * i_ind, prefixes[i_ind], size);
-                break;
-            }
-        }
-    }
-
-    bd_size_t block_size = block_device->get_erase_size();
-    unsigned addrwidth = ceil(log(float(block_device->size() - 1)) / log(float(16))) + 1;
-
-    uint8_t *write_block = new (std::nothrow) uint8_t[block_size];
-    uint8_t *read_block = new (std::nothrow) uint8_t[block_size];
-
-    if (!write_block || !read_block) {
-        utest_printf("Not enough memory for test\n");
-        goto end;
-    }
-
-    for (int b = 0; b < TEST_BLOCK_COUNT; b++) {
-        basic_erase_program_read_test(block_device, block_size, write_block, read_block, addrwidth, 0);
-    }
-
-end:
-    delete[] write_block;
-    delete[] read_block;
+    mbed_stats_cpu_t stats;
+    mbed_stats_cpu_get(&stats);
+ 
+    uint64_t diff = (stats.idle_time - prev_idle_time);
+    uint8_t idle = (diff * 100) / (SAMPLE_TIME*1000);    // usec;
+    uint8_t usage = 100 - ((diff * 100) / (SAMPLE_TIME*1000));    // usec;;
+    prev_idle_time = stats.idle_time;
+ 
+    printf("Idle: %d Usage: %d \n", idle, usage);
 }
 
-static void test_thread_job(void *block_device_ptr)
+int g_threads_alive = 1;
+
+static void cpu_thread_job(void *a_arg)
 {
-    static int thread_num = 0;
-    _mutex->lock();
-    int block_num = thread_num++;
-    _mutex->unlock();
-    BlockDevice *block_device = (BlockDevice *)block_device_ptr;
+    // Request the shared queue
+    EventQueue *stats_queue = mbed_event_queue();
+    int id;
+ 
+    id = stats_queue->call_every(SAMPLE_TIME, calc_cpu_usage);
 
-    bd_size_t block_size = block_device->get_erase_size();
-    unsigned addrwidth = ceil(log(float(block_device->size() - 1)) / log(float(16))) + 1;
-
-    uint8_t *write_block = new (std::nothrow) uint8_t[block_size];
-    uint8_t *read_block = new (std::nothrow) uint8_t[block_size];
-
-    if (!write_block || !read_block) {
-        utest_printf("Not enough memory for test\n");
-        goto end;
+    while (g_threads_alive) {
+	wait_ms(500);
     }
-
-    for (int b = 0; b < TEST_BLOCK_COUNT; b++) {
-        basic_erase_program_read_test(block_device, block_size, write_block, read_block, addrwidth, block_num);
-    }
-
-end:
-    delete[] write_block;
-    delete[] read_block;
 }
 
-void test_multi_threads()
+
+static void worker_thread_job(void *a_arg)
 {
-    utest_printf("\nTest Multi Threaded Erase/Program/Read Starts..\n");
+   int i_ind = 0;
+   float j_ind = 2.3;
+   int l_counter = 0;
 
-    TEST_SKIP_UNLESS_MESSAGE(block_device != NULL, "no block device found.");
+   printf("Starting Worker Thread\n");
+   while (g_threads_alive) {
+	i_ind+=23;
 
-    for (unsigned atr = 0; atr < sizeof(ATTRS) / sizeof(ATTRS[0]); atr++) {
-        static const char *prefixes[] = {"", "k", "M", "G"};
-        for (int i_ind = 3; i_ind >= 0; i_ind--) {
-            bd_size_t size = (block_device->*ATTRS[atr].method)();
-            if (size >= (1ULL << 10 * i_ind)) {
-                utest_printf("%s: %llu%sbytes (%llubytes)\n",
-                             ATTRS[atr].name, size >> 10 * i_ind, prefixes[i_ind], size);
-                break;
-            }
-        }
-    }
+	l_counter++;
+	if (l_counter % 7 == 0) {
+	wait_ms(1);
+	i_ind+=1117;
+	}
 
+	i_ind/=j_ind;
+	j_ind+=0.27;
+	if (i_ind > 0xFFFFFFF) {
+	printf("\nOFR_DBG i_ind: %d\n",i_ind);
+	i_ind = 0;
+	}
+   }    
+}
+
+
+
+
+void test_prog_read_multi_threaded()
+{
     osStatus threadStatus;
-    int i_ind, j_ind;
-    char *dummy;
+    int j_ind;
+    int t_ind = 0;
+    int l_arg = 0;
 
-    rtos::Thread **bd_thread = new (std::nothrow) rtos::Thread*[TEST_NUM_OF_THREADS];
-    TEST_SKIP_UNLESS_MESSAGE((*bd_thread) != NULL, "not enough heap to run test.");
-    memset(bd_thread, 0, TEST_NUM_OF_THREADS * sizeof(rtos::Thread *));
+    utest_printf("\nTest Program Read Multi Starts..\n");
+    TEST_SKIP_UNLESS_MESSAGE(block_device != NULL, "no block device found.");
 
-    for (i_ind = 0; i_ind < TEST_NUM_OF_THREADS; i_ind++) {
-
-        bd_thread[i_ind] = new (std::nothrow) rtos::Thread((osPriority_t)((int)osPriorityNormal), TEST_THREAD_STACK_SIZE);
-        dummy = new (std::nothrow) char[TEST_THREAD_STACK_SIZE];
-
-        if (!bd_thread[i_ind] || !dummy) {
-            utest_printf("Not enough heap to run Thread  %d !\n", i_ind + 1);
-            break;
+    /* Print Block Device Properties */
+    for (unsigned atr = 0; atr < sizeof(ATTRS) / sizeof(ATTRS[0]); atr++) {
+        static const char *prefixes[] = {"", "k", "M", "G"};
+        for (int i_ind = 3; i_ind >= 0; i_ind--) {
+            bd_size_t size = (block_device->*ATTRS[atr].method)();
+            if (size >= (1ULL << 10 * i_ind)) {
+                utest_printf("%s: %llu%sbytes (%llubytes)\n",
+                             ATTRS[atr].name, size >> 10 * i_ind, prefixes[i_ind], size);
+                break;
+            }
         }
-        delete[] dummy;
+    }
 
-        threadStatus = bd_thread[i_ind]->start(callback(test_thread_job, (void *)block_device));
+
+    bd_size_t block_size = 4*1024; // Programing in 4KB Chunks
+    unsigned addrwidth = ceil(log(float(block_device->size() - 1)) / log(float(16))) + 1;
+
+    uint8_t *write_block = new (std::nothrow) uint8_t[block_size];
+    uint8_t *read_block = new (std::nothrow) uint8_t[block_size];
+
+    int b, val_rand;
+    bd_size_t i_ind = 0;
+    int err = 0;
+    // Make sure block address per each test is unique
+    static unsigned block_seed = 1;
+    unsigned seed;
+    bd_addr_t block = 64*1024*1024 % block_device->size();
+
+
+    if (!write_block || !read_block) {
+        utest_printf("Not enough memory for test\n");
+        return;
+    }
+
+    srand(block_seed++);
+
+
+    /* Erase 64MB at address 64M */
+    printf("\n Now Erasing...\n");
+    err = block_device->erase(block, 64*1024*1024);
+    TEST_ASSERT_EQUAL(0, err);
+
+    /* Select initial 'random' Seed for Write/Read data */
+    seed = rand();
+    // Fill with random sequence
+    srand(seed);
+
+    /* ***A. Programing Data at 4KB Chunks */
+
+    block_size = 4096;
+    printf("\n Started Programing...\n");
+    for (b = 0; b < TEST_BLOCK_COUNT; b++) {
+       memset(write_block,0,4096);
+       for (i_ind = 0; i_ind < block_size; i_ind++) {
+	   write_block[i_ind] = 0xff & rand();
+       }
+       err = block_device->program(write_block, block, block_size);
+       TEST_ASSERT_EQUAL(0, err);
+       block += block_size;
+    }
+    printf("\n Programing Done...\n");
+
+
+    /* ***B. Creat CPU Measuring thread and Worker Thread */
+    rtos::Thread **bd_thread = new (std::nothrow) rtos::Thread*[L_NUM_WORKER_THREADS+1];
+
+    memset(bd_thread, 0, (L_NUM_WORKER_THREADS+1) * sizeof(rtos::Thread *));
+
+    bd_thread[0] = new (std::nothrow) rtos::Thread((osPriority_t)((int)osPriorityNormal), TEST_THREAD_STACK_SIZE);
+    threadStatus = bd_thread[0]->start(callback(cpu_thread_job, (void *)&l_arg));
+    if (threadStatus != 0) {
+       utest_printf("Thread %d Start Failed!\n", t_ind + 1);
+    }
+
+    for (t_ind = 1; t_ind < (L_NUM_WORKER_THREADS+1); t_ind++) {
+
+        bd_thread[t_ind] = new (std::nothrow) rtos::Thread((osPriority_t)((int)osPriorityNormal), TEST_THREAD_STACK_SIZE);
+ 
+        threadStatus = bd_thread[t_ind]->start(callback(worker_thread_job, (void *)&l_arg));
         if (threadStatus != 0) {
-            utest_printf("Thread %d Start Failed!\n", i_ind + 1);
+            utest_printf("Thread %d Start Failed!\n", t_ind + 1);
             break;
         }
     }
 
-    for (j_ind = 0; j_ind < i_ind; j_ind++) {
+    /* Measure Only Worker Thread CPU for 10 seconds */
+    wait(10);
+
+
+
+   /* ***C. Start Reading 64MB from address 64M at 1KB Chunks */
+   block = 64*1024*1024 % block_device->size();
+    
+   /* use same seed as for program, to repeat the same expected data sequence */
+   srand(seed);
+
+   block_size = 1024;
+
+   printf("\n Now Reading...\n");
+
+   for (b = 0; b < TEST_BLOCK_COUNT*4; b++) {
+       memset(read_block,0,4096);
+
+	/* read 1024 bytes chunk */
+       err = block_device->read(read_block, block, block_size);
+       TEST_ASSERT_EQUAL(0, err);
+
+        /* verify content with expected content according to 'rand' sequence */
+       for (i_ind = 0; i_ind < block_size; i_ind++) {
+		val_rand = rand();
+		if ((0xff & val_rand) != read_block[i_ind]) {
+		    utest_printf("\n Assert Failed Buf Read - block:size: %llx:%llu \n", block, block_size);
+		    utest_printf("\n pos: %llu, exp: %02x, act: %02x \n", i_ind, (0xff & val_rand), read_block[i_ind]);
+		}
+		TEST_ASSERT_EQUAL(0xff & val_rand, read_block[i_ind]);
+       }
+
+       block += block_size;
+   }
+
+    delete[] write_block;
+    delete[] read_block;
+
+
+    printf("\nOFR_DBG WAiting For Threads to Join\n");
+    g_threads_alive = 0;
+
+    for (j_ind = 0; j_ind < t_ind; j_ind++) {
         bd_thread[j_ind]->join();
     }
 
     if (bd_thread) {
-        for (j_ind = 0; j_ind < i_ind; j_ind++) {
+        for (j_ind = 0; j_ind < t_ind; j_ind++) {
             delete bd_thread[j_ind];
         }
 
@@ -384,333 +414,8 @@ void test_multi_threads()
 
 }
 
-void test_erase_functionality()
-{
-    utest_printf("\nTest BlockDevice::get_erase_value()..\n");
 
-    // Test flow:
-    //  1. Write data to selected region
-    //    - Known starting point
-    //  2. Erase selected region
-    //  3. Read erased region and compare with get_erase_value()
 
-    TEST_SKIP_UNLESS_MESSAGE(block_device != NULL, "no block device found.");
-
-    // Check erase value
-    int erase_value_int = block_device->get_erase_value();
-    utest_printf("block_device->get_erase_value()=%d\n", erase_value_int);
-    TEST_SKIP_UNLESS_MESSAGE(erase_value_int >= 0, "Erase not supported in this block device. Test skipped.");
-
-    // Assuming that get_erase_value() returns byte value as documentation mentions
-    // "If get_erase_value() returns a non-negative byte value" for unknown case.
-    TEST_ASSERT(erase_value_int <= 255);
-    uint8_t erase_value = (uint8_t)erase_value_int;
-
-    // Determine data_buf_size
-    bd_size_t erase_size = block_device->get_erase_size();
-    TEST_ASSERT(erase_size > 0);
-    bd_size_t data_buf_size = erase_size;
-
-    // Determine start_address
-    bd_addr_t start_address = rand();            // low 32 bytes
-    start_address += (uint64_t)rand() << 32;     // high 32 bytes
-    start_address %= block_device->size() - data_buf_size - erase_size; //  fit all data + alignment reserve
-    start_address += erase_size;                 // add alignment reserve
-    start_address -= start_address % erase_size; // align with erase_block
-    utest_printf("start_address=0x%016" PRIx64 "\n", start_address);
-
-    // Flashiap boards with inconsistent sector size will not align with random start addresses
-    if (bd_arr[test_iteration] == flashiap) {
-        start_address = 0;
-    }
-
-    // Allocate buffer for write test data
-    uint8_t *data_buf = (uint8_t *)malloc(data_buf_size);
-    TEST_SKIP_UNLESS_MESSAGE(data_buf, "Not enough memory for test.\n");
-
-    // Allocate buffer for read test data
-    uint8_t *out_data_buf = (uint8_t *)malloc(data_buf_size);
-    TEST_SKIP_UNLESS_MESSAGE(out_data_buf, "Not enough memory for test.\n");
-
-    // First must Erase given memory region
-    utest_printf("erasing given memory region\n");
-    int err = block_device->erase(start_address, data_buf_size);
-    TEST_ASSERT_EQUAL(0, err);
-
-    // Write random data to selected region to make sure data is not accidentally set to "erased" value.
-    // With this pre-write, the test case will fail even if block_device->erase() is broken.
-    for (bd_size_t i = 0; i < data_buf_size; i++) {
-        data_buf[i] = (uint8_t) rand();
-    }
-
-    utest_printf("writing given memory region\n");
-    err = block_device->program((const void *)data_buf, start_address, data_buf_size);
-    TEST_ASSERT_EQUAL(0, err);
-
-    // Read written memory region to verify it contains information
-    memset(out_data_buf, 0, data_buf_size);
-    utest_printf("reading written memory region\n");
-    err = block_device->read((void *)out_data_buf, start_address, data_buf_size);
-    TEST_ASSERT_EQUAL(0, err);
-
-    // Verify erased memory region
-    utest_printf("verifying written memory region\n");
-    for (bd_size_t i = 0; i < data_buf_size; i++) {
-        TEST_ASSERT_EQUAL(out_data_buf[i], data_buf[i]);
-    }
-
-    // Erase given memory region
-    utest_printf("erasing written memory region\n");
-    err = block_device->erase(start_address, data_buf_size);
-    TEST_ASSERT_EQUAL(0, err);
-
-    // Read erased memory region
-    utest_printf("reading erased memory region\n");
-    memset(out_data_buf, 0, data_buf_size);
-    err = block_device->read((void *)out_data_buf, start_address, data_buf_size);
-    TEST_ASSERT_EQUAL(0, err);
-
-    // Verify erased memory region
-    utest_printf("verifying erased memory region\n");
-    for (bd_size_t i = 0; i < data_buf_size; i++) {
-        TEST_ASSERT_EQUAL(erase_value, out_data_buf[i]);
-    }
-
-    free(data_buf);
-    free(out_data_buf);
-}
-
-void test_contiguous_erase_write_read()
-{
-    utest_printf("\nTest Contiguous Erase/Program/Read Starts..\n");
-
-    TEST_SKIP_UNLESS_MESSAGE(block_device != NULL, "no block device found.");
-
-    // Flashiap boards with inconsistent sector size will not align with random start addresses
-    if (bd_arr[test_iteration] == flashiap) {
-        return;
-    }
-
-    // Test flow:
-    //  1. Erase whole test area
-    //    - Tests contiguous erase
-    //  2. Write smaller memory area
-    //    - Tests contiguous sector writes
-    //  3. Return step 2 for whole erase region
-
-    // Test parameters
-    bd_size_t erase_size = block_device->get_erase_size();
-    TEST_ASSERT(erase_size > 0);
-    bd_size_t program_size = block_device->get_program_size();
-    TEST_ASSERT(program_size > 0);
-    utest_printf("erase_size=%" PRId64 "\n", erase_size);
-    utest_printf("program_size=%" PRId64 "\n", program_size);
-    utest_printf("block_device->size()=%" PRId64 "\n", block_device->size());
-
-    // Determine write/read buffer size
-    //  start write_read_buf_size from 1% block_device->size()
-    bd_size_t write_read_buf_size = block_device->size() / 100; // 1%, 10k=100, 100k=1k, 1MB=10k, 32MB=32k
-    //  try to limit write_read_buf_size to 10k. If program_size*2 is larger than 10k, that will be used instead.
-    if (write_read_buf_size > 10000) {
-        write_read_buf_size = 10000;
-    }
-    //  2 program_size blocks is minimum for contiguous write/read test
-    if (write_read_buf_size < program_size * 2) {
-        write_read_buf_size = program_size * 2; // going over 10k
-    }
-    bd_size_t contiguous_write_read_blocks_per_region = write_read_buf_size /
-                                                        program_size; // 2 is minimum to test contiguous write
-    write_read_buf_size = contiguous_write_read_blocks_per_region * program_size;
-    utest_printf("contiguous_write_read_blocks_per_region=%" PRIu64 "\n", contiguous_write_read_blocks_per_region);
-    utest_printf("write_read_buf_size=%" PRIu64 "\n", write_read_buf_size);
-
-    // Determine test region count
-    int contiguous_write_read_regions = TEST_BLOCK_COUNT;
-    utest_printf("contiguous_write_read_regions=%d\n", contiguous_write_read_regions);
-
-    // Determine whole erase size
-    bd_size_t contiguous_erase_size = write_read_buf_size * contiguous_write_read_regions;
-    contiguous_erase_size -= contiguous_erase_size % erase_size; // aligned to erase_size
-    contiguous_erase_size += erase_size; // but larger than write/read size * regions
-    utest_printf("contiguous_erase_size=%" PRIu64 "\n", contiguous_erase_size);
-
-    // Determine starting address
-    bd_addr_t start_address = rand();            // low 32 bytes
-    start_address += (uint64_t)rand() << 32;     // high 32 bytes
-    start_address %= block_device->size() - contiguous_erase_size - erase_size; //  fit all data + alignment reserve
-    start_address += erase_size;                 // add alignment reserve
-    start_address -= start_address % erase_size; // align with erase_block
-    bd_addr_t stop_address = start_address + write_read_buf_size * contiguous_write_read_regions;
-    utest_printf("start_address=0x%016" PRIx64 "\n", start_address);
-    utest_printf("stop_address=0x%016" PRIx64 "\n", stop_address);
-
-    // Allocate write/read buffer
-    uint8_t *write_read_buf = (uint8_t *)malloc(write_read_buf_size);
-    if (write_read_buf == NULL) {
-        TEST_SKIP_MESSAGE("not enough memory for test");
-    }
-    utest_printf("write_read_buf_size=%" PRIu64 "\n", (uint64_t)write_read_buf_size);
-
-    // Must Erase the whole region first
-    utest_printf("erasing memory, from 0x%" PRIx64 " of size 0x%" PRIx64 "\n", start_address, contiguous_erase_size);
-    int err = block_device->erase(start_address, contiguous_erase_size);
-    TEST_ASSERT_EQUAL(0, err);
-
-    // Pre-fill the to-be-erased region. By pre-filling the region,
-    // we can be sure the test will not pass if the erase doesn't work.
-    for (bd_size_t offset = 0; start_address + offset < stop_address; offset += write_read_buf_size) {
-        for (size_t i = 0; i < write_read_buf_size; i++) {
-            write_read_buf[i] = (uint8_t)rand();
-        }
-        utest_printf("pre-filling memory, from 0x%" PRIx64 " of size 0x%" PRIx64 "\n", start_address + offset,
-                     write_read_buf_size);
-        err = block_device->program((const void *)write_read_buf, start_address + offset, write_read_buf_size);
-        TEST_ASSERT_EQUAL(0, err);
-    }
-
-    // Erase the whole region again
-    utest_printf("erasing memory, from 0x%" PRIx64 " of size 0x%" PRIx64 "\n", start_address, contiguous_erase_size);
-    err = block_device->erase(start_address, contiguous_erase_size);
-    TEST_ASSERT_EQUAL(0, err);
-
-    // Loop through all write/read regions
-    int region = 0;
-    for (; start_address < stop_address; start_address += write_read_buf_size) {
-        utest_printf("\nregion #%d start_address=0x%016" PRIx64 "\n", region++, start_address);
-
-        // Generate test data
-        unsigned int seed = rand();
-        utest_printf("generating test data, seed=%u\n", seed);
-        srand(seed);
-        for (size_t i = 0; i < write_read_buf_size; i++) {
-            write_read_buf[i] = (uint8_t)rand();
-        }
-
-        // Write test data
-        utest_printf("writing test data\n");
-        err = block_device->program((const void *)write_read_buf, start_address, write_read_buf_size);
-        TEST_ASSERT_EQUAL(0, err);
-
-        // Read test data
-        memset(write_read_buf, 0, (size_t)write_read_buf_size);
-        utest_printf("reading test data\n");
-        err = block_device->read(write_read_buf, start_address, write_read_buf_size);
-        TEST_ASSERT_EQUAL(0, err);
-
-        // Verify read data
-        utest_printf("verifying test data\n");
-        srand(seed);
-        for (size_t i = 0; i < write_read_buf_size; i++) {
-            uint8_t expected_value = (uint8_t)rand();
-            if (write_read_buf[i] != expected_value) {
-                utest_printf("data verify failed, write_read_buf[%d]=%" PRIu8 " and not %" PRIu8 "\n",
-                             i, write_read_buf[i], expected_value);
-            }
-            TEST_ASSERT_EQUAL(write_read_buf[i], expected_value);
-        }
-        utest_printf("verify OK\n");
-    }
-
-    free(write_read_buf);
-}
-
-void test_program_read_small_data_sizes()
-{
-    utest_printf("\nTest program-read small data sizes, from 1 to 7 bytes..\n");
-
-    TEST_SKIP_UNLESS_MESSAGE(block_device != NULL, "no block device found.");
-
-    bd_size_t erase_size = block_device->get_erase_size();
-    bd_size_t program_size = block_device->get_program_size();
-    bd_size_t read_size = block_device->get_read_size();
-    TEST_ASSERT(program_size > 0);
-
-    // See that we have enough memory for buffered block device
-    char *dummy = new (std::nothrow) char[program_size + read_size];
-    TEST_SKIP_UNLESS_MESSAGE(dummy, "Not enough memory for test.\n");
-    delete[] dummy;
-
-    // use BufferedBlockDevice for better handling of block devices program and read
-    BufferedBlockDevice *buff_block_device = new BufferedBlockDevice(block_device);
-
-    // BlockDevice initialization
-    int err = buff_block_device->init();
-    TEST_ASSERT_EQUAL(0, err);
-
-    const char write_buffer[] = "1234567";
-    char read_buffer[7] = {};
-
-    // Determine starting address
-    bd_addr_t start_address = 0;
-
-    for (int i = 1; i <= 7; i++) {
-        err = buff_block_device->erase(start_address, erase_size);
-        TEST_ASSERT_EQUAL(0, err);
-
-        err = buff_block_device->program((const void *)write_buffer, start_address, i);
-        TEST_ASSERT_EQUAL(0, err);
-
-        err = buff_block_device->sync();
-        TEST_ASSERT_EQUAL(0, err);
-
-        err = buff_block_device->read(read_buffer, start_address, i);
-        TEST_ASSERT_EQUAL(0, err);
-
-        err = memcmp(write_buffer, read_buffer, i);
-        TEST_ASSERT_EQUAL(0, err);
-    }
-
-    // BlockDevice deinitialization
-    err = buff_block_device->deinit();
-    TEST_ASSERT_EQUAL(0, err);
-
-    delete buff_block_device;
-}
-
-
-void test_unaligned_erase_blocks()
-{
-
-    utest_printf("\nTest Unaligned Erase Starts..\n");
-
-    TEST_SKIP_UNLESS_MESSAGE(block_device != NULL, "no block device found.");
-
-    TEST_SKIP_UNLESS_MESSAGE(block_device->get_erase_value() != -1, "block device has no erase functionality.");
-
-    bd_addr_t addr = 0;
-    bd_size_t sector_erase_size = block_device->get_erase_size(addr);
-    unsigned addrwidth = ceil(log(float(block_device->size() - 1)) / log(float(16))) + 1;
-
-    utest_printf("\ntest  %0*llx:%llu...", addrwidth, addr, sector_erase_size);
-
-    //unaligned start address
-    addr += 1;
-    int err = block_device->erase(addr, sector_erase_size - 1);
-    TEST_ASSERT_NOT_EQUAL(0, err);
-
-    err = block_device->erase(addr, sector_erase_size);
-    TEST_ASSERT_NOT_EQUAL(0, err);
-
-    err = block_device->erase(addr, 1);
-    TEST_ASSERT_NOT_EQUAL(0, err);
-
-    //unaligned end address
-    addr = 0;
-
-    err = block_device->erase(addr, 1);
-    TEST_ASSERT_NOT_EQUAL(0, err);
-
-    err = block_device->erase(addr, sector_erase_size + 1);
-    TEST_ASSERT_NOT_EQUAL(0, err);
-
-    //erase size exceeds flash device size
-    err = block_device->erase(addr, block_device->size() + 1);
-    TEST_ASSERT_NOT_EQUAL(0, err);
-
-    // Valid erase
-    err = block_device->erase(addr, sector_erase_size);
-    TEST_ASSERT_EQUAL(0, err);
-}
 
 void test_deinit_bd()
 {
@@ -725,6 +430,7 @@ void test_deinit_bd()
 
     block_device = NULL;
 }
+
 
 void test_get_type_functionality()
 {
@@ -763,12 +469,7 @@ typedef struct {
 
 template_case_t template_cases[] = {
     {"Testing Init block device", test_init_bd, greentea_failure_handler},
-    {"Testing read write random blocks", test_random_program_read_erase, greentea_failure_handler},
-    {"Testing multi threads erase program read", test_multi_threads, greentea_failure_handler},
-    {"Testing contiguous erase, write and read", test_contiguous_erase_write_read, greentea_failure_handler},
-    {"Testing BlockDevice erase functionality", test_erase_functionality, greentea_failure_handler},
-    {"Testing program read small data sizes", test_program_read_small_data_sizes, greentea_failure_handler},
-    {"Testing unaligned erase blocks", test_unaligned_erase_blocks, greentea_failure_handler},
+    {"Testing prog read multi", test_prog_read_multi_threaded, greentea_failure_handler},
     {"Testing Deinit block device", test_deinit_bd, greentea_failure_handler},
 };
 

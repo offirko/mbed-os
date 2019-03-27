@@ -1,0 +1,11 @@
+{
+    "target_overrides": {
+        "CY8CKIT_062_WIFI_BT": {
+		"platform.stdio-baud-rate"    : 115200,
+                "sd.SPI_MOSI": "P12_0",
+                "sd.SPI_MISO": "P12_1",
+                "sd.SPI_CLK":  "P12_2",
+                "sd.SPI_CS":   "P12_3"
+        }
+   }
+}

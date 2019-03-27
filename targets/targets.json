@@ -8007,7 +8007,6 @@
     },
     "MCU_PSOC6_M4": {
         "inherits": ["MCU_PSOC6"],
-        "components_add": ["FLASHIAP"],
         "macros_add": ["MCU_PSOC6_M4"],
         "public": false
     },
@@ -8023,6 +8022,7 @@
     },
     "CY8CKIT_062_WIFI_BT": {
         "inherits": ["MCU_PSOC6_M4"],
+	"components_add": ["SD"],
         "features": ["BLE"],
         "supported_form_factors": ["ARDUINO"],
         "extra_labels_add": ["PSOC6_01", "WICED", "CYW43XXX", "CYW4343X", "CORDIO", "CY8C62XX"],
@@ -8038,7 +8038,7 @@
     },
     "CY8CKIT_062_WIFI_BT_M0_PSA": {
         "inherits": ["SPE_Target", "CY8CKIT_062_WIFI_BT_M0"],
-        "components_add": ["SPM_MAILBOX", "FLASHIAP"],
+        "components_add": ["SPM_MAILBOX"],
         "extra_labels_add": ["PSA", "MBED_SPM"],
         "macros_add": [
             "MBED_TICKLESS",
@@ -8067,7 +8067,7 @@
     "CY8CKIT_062_WIFI_BT_PSA": {
         "inherits": ["NSPE_Target", "CY8CKIT_062_WIFI_BT"],
         "extra_labels_add": ["PSA", "MBED_SPM"],
-        "components_add": ["SPM_MAILBOX", "FLASHIAP"],
+        "components_add": ["SPM_MAILBOX"],
         "device_has_remove": ["CRC"],
         "macros_add": ["MBEDTLS_PSA_CRYPTO_C"],
         "hex_filename": "psa_release_1.0.hex",
